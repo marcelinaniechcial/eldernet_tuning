@@ -1,0 +1,17 @@
+defaults:
+  - _self_
+  - model: ElderNet
+  - augmentation: all
+  - dataloader: ten_sec_no_overlap
+
+model:
+  ssl_method: mtl
+  num_epochs : 5
+  lr :  1e-4
+  batch_size : 100
+  patience: 5
+
+data:
+  data_root: N:\Gait-Neurodynamics by Names\Yonatan\SSL\ElderNet\data\MobiliseD\data #N:\Gait-Neurodynamics by Names\Yonatan\Moblise-D\parsed_data\OAs\10secNoOverlap\WithoutPreprocess\final\train
+  log_path: N:\Gait-Neurodynamics by Names\Yonatan\SSL\ElderNet\data\MobiliseD
+  dense_labeling: False
