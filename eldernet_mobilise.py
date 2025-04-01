@@ -11,6 +11,7 @@ def load_model(repo_name, model_name, device):
     return model.to(device)
 
 def main(input):
+    torch.manual_seed(42)
     repo_name = 'yonbrand/ElderNet'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
@@ -46,7 +47,7 @@ def run(with_parkinson):
         data = pd.read_parquet(directory + "/" + f)
         input, true_labels = make_windows(data)
         ft_output = main(input)
-        predicted_labels = torch.argmax(ft_output, dim=1).numpy()
+        predicted_labels = torch.argmax(ft_output, dim=1).cpu.numpy()
 
         all_true.extend(true_labels)
         all_pred.extend(predicted_labels)

@@ -84,7 +84,7 @@ def make_windows(data):
     """
     windows = []
     labels = []
-    acceptance_parameter = 0.95
+    acceptance_parameter = 0.55
     accelerometer = ["accelerometer_x", "accelerometer_y", "accelerometer_z"]
 
     input = data[accelerometer].values
