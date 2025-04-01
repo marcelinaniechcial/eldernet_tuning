@@ -4,7 +4,14 @@ import numpy as np
 import os
 
 def pd_recognition(data):
+    """The function distinguishes between PD and control group before pre-processing the data. 
 
+    Args:
+        data (df): time-stamped data with labels
+
+    Returns:
+        Boolean : True if PD, False if control 
+    """
     if "pre_or_post" in data:
         return True
     return False
@@ -30,7 +37,7 @@ def downsample(data):
     """Downsampling data to 30HZ by interpolation for float values and nearest label for string values (free_living_label)
 
     Args:
-        data (df): time-stamped data for one patient with labels
+        data (df): time-stamped data with labels
 
     Returns:
         data: modified data with 30HZ
@@ -77,7 +84,7 @@ def make_windows(data):
     """
     windows = []
     labels = []
-    acceptance_parameter = 0.9
+    acceptance_parameter = 0.95
     accelerometer = ["accelerometer_x", "accelerometer_y", "accelerometer_z"]
 
     input = data[accelerometer].values
@@ -106,10 +113,10 @@ def process(data):
     return data
 
 
-directory_origin = "data_parkinson@home/baseline_data"
+directory_origin = "data_parkinson_home/baseline_data"
 
-directory_processed_controls = "data_parkinson@home/processed_data/control"
-directory_processed_pd = "data_parkinson@home/processed_data/pd"
+directory_processed_controls = "data_parkinson_home/processed_data/control"
+directory_processed_pd = "data_parkinson_home/processed_data/pd"
 
 #view example file
 # temp = pd.read_parquet(directory_origin  + "/" + "hbv053_LAS.parquet")arquet")
@@ -117,15 +124,16 @@ directory_processed_pd = "data_parkinson@home/processed_data/pd"
 
 
 #loading and processing data
-for f in os.listdir(directory_origin):
+if __name__ == "__main__":
+    for f in os.listdir(directory_origin):
 
-    file = pd.read_parquet(directory_origin + "/" + f)
+        file = pd.read_parquet(directory_origin + "/" + f)
 
-    if pd_recognition(file):
-        directory = directory_processed_pd
-    else: 
-        directory = directory_processed_controls
+        if pd_recognition(file):
+            directory = directory_processed_pd
+        else: 
+            directory = directory_processed_controls
 
-    processed = process(file)
-    processed.to_parquet(directory + "/" + f)
+        processed = process(file)
+        processed.to_parquet(directory + "/" + f)
 
