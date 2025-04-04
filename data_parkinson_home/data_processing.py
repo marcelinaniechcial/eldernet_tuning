@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 
-def pd_recognition(data):
+def pd_recognition(data: pd.DataFrame) -> pd.DataFrame:
     """The function distinguishes between PD and control group before pre-processing the data. 
 
     Args:
@@ -17,7 +17,7 @@ def pd_recognition(data):
     return False
 
 
-def drop_gyroscope(data):
+def drop_gyroscope(data: pd.DataFrame) -> pd.DataFrame:
     """Dropping unnecessery data
 
     Args:
@@ -33,7 +33,7 @@ def drop_gyroscope(data):
     return data.drop(columns=columns)
 
 
-def downsample(data):
+def downsample(data: pd.DataFrame) -> pd.DataFrame:
     """Downsampling data to 30HZ by interpolation for float values and nearest label for string values (free_living_label)
 
     Args:
@@ -43,7 +43,7 @@ def downsample(data):
         data: modified data with 30HZ
     """
     accelerometer = ["accelerometer_x", "accelerometer_y", "accelerometer_z"]
-    cs = CubicSpline(data.iloc[:, 0], data[accelerometer])
+    cs = CubicSpline(data["time"], data[accelerometer])
 
     sampled_time = np.arange(data["time"].iloc[0], data["time"].iloc[-1], 1/30)
 
@@ -54,11 +54,11 @@ def downsample(data):
     return sampled_data
 
 
-def walking_to_binary(data):
+def walking_to_binary(data: pd.DataFrame) -> pd.DataFrame:
     """changes free_living_labels into binary encoding where 1 is gait and 0 is non gait
 
     Args:
-        data (df): time-stamped data for one patient with labels
+        data (df): time-stamped data for one person with labels
 
     Returns:
         data: modified data with bianry-gait column and changed column label
@@ -66,12 +66,13 @@ def walking_to_binary(data):
 
     data['free_living_label'] = np.where(
         (data['free_living_label'] == "Walking"), 1, 0)
+    
     data.columns = ["time", "accelerometer_x", "accelerometer_y", "accelerometer_z", "gait"]
 
     return data
 
-def make_windows(data):
-    """The function splits accelometer data into 300 samples (10s) windows. 
+def make_windows(data: pd.DataFrame) -> pd.DataFrame:
+    """The function splits accelometer data into 300 samples (10s) windows and normalising data
     Each window is labeled 1 if tthreshold for gait is passed (acceptance_parameter) and 0 otherwise. 
     
 
@@ -84,20 +85,23 @@ def make_windows(data):
     """
     windows = []
     labels = []
-    acceptance_parameter = 0.55
+    acceptance_parameter = 0.5
     accelerometer = ["accelerometer_x", "accelerometer_y", "accelerometer_z"]
-
+    # normalising
+    data[accelerometer] = (data[accelerometer]-data[accelerometer].mean())/data[accelerometer].std()
     input = data[accelerometer].values
     output = data["gait"].values
 
     for i in range(0,data.shape[0]-300,300):
 
-        windows.append(input[i:i+300,:].T)
+        window = input[i:i+300,:].T 
 
         if sum(output[i:i+300])>=300*acceptance_parameter:
             labels.append(1)
         else:
             labels.append(0)
+        
+        windows.append(window)
             
     windows = np.array(windows)
     labels = np.array(labels)
@@ -105,7 +109,17 @@ def make_windows(data):
 
     return windows,labels
 
-def process(data):
+def process(data: pd.DataFrame) -> pd.DataFrame:
+    """This funtion takes raw data and returns processed data. 
+    Processing includes dropping uneccessery features, downsampling and one-hot encoding and normalisation 
+
+    Args:
+        data (df):  time-stamped data for one person with labels
+
+    Returns:
+        df: processed data
+    """
+
     data = drop_gyroscope(data)
     data = downsample(data)
     data = walking_to_binary(data)
@@ -119,12 +133,13 @@ directory_processed_controls = "data_parkinson_home/processed_data/control"
 directory_processed_pd = "data_parkinson_home/processed_data/pd"
 
 #view example file
-# temp = pd.read_parquet(directory_origin  + "/" + "hbv053_LAS.parquet")arquet")
+# temp = pd.read_parquet(directory_origin  + "/" + "hbv053_LAS.parquet"))
 # print(temp.head())
 
 
 #loading and processing data
 if __name__ == "__main__":
+
     for f in os.listdir(directory_origin):
 
         file = pd.read_parquet(directory_origin + "/" + f)
