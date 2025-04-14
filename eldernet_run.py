@@ -6,8 +6,19 @@ import torch
 import os
 import pandas as pd
 
-def load_model(repo_name, model_name, device):
+
+def load_model(tuned):
+
+    model_name = "eldernet_ft"
+    repo_name = 'yonbrand/ElderNet'
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = torch.hub.load(repo_name, model_name)
+
+    if tuned:
+        model.load_state_dict(torch.load("eldernet_tuned_gait.pt", weights_only=True))
+
+    model.eval()
+
     return model.to(device)
 
 def main(input) -> torch.tensor:
@@ -26,12 +37,14 @@ def main(input) -> torch.tensor:
     # Generate sample data (10 seconds window, 30Hz sampling rate)
     x = torch.FloatTensor(input).to(device)
 
-    ft_model = load_model(repo_name, 'eldernet_ft', device)
-    
+    ft_model = load_model(True)
+
+
     with torch.no_grad():
         ft_output = ft_model(x)
-    
+
     print(f"Fine-tuned Model Output Shape: {ft_output.shape}")
+
     return ft_output
 
 def evaluation(true,predicted) -> None:
@@ -69,7 +82,6 @@ def run(with_parkinson: bool) -> None:
         try:
             data = pd.read_parquet(directory + "/" + f)
             input, true_labels = make_windows(data)
-
             ft_output = main(input)
             predicted_labels = torch.argmax(ft_output, dim=1).cpu().numpy()
 
@@ -86,7 +98,7 @@ def run(with_parkinson: bool) -> None:
     print("Avarage:")
     evaluation(all_true,all_pred)
 
-    
+
 if __name__ == "__main__":
 
     np.random.seed(42)

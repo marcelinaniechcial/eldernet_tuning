@@ -73,11 +73,11 @@ def walking_to_binary(data: pd.DataFrame) -> pd.DataFrame:
 
 def make_windows(data: pd.DataFrame) -> pd.DataFrame:
     """The function splits accelometer data into 300 samples (10s) windows and normalising data
-    Each window is labeled 1 if tthreshold for gait is passed (acceptance_parameter) and 0 otherwise. 
+    Each window is labeled 1 if threshold for gait is passed (acceptance_parameter) and 0 otherwise. 
     
 
     Args:
-        data (df): _description_
+        data (): _description_
 
     Returns:
         windows: array of size (number_of_windows, 3, 300) 
@@ -128,7 +128,6 @@ def process(data: pd.DataFrame) -> pd.DataFrame:
 
 
 directory_origin = "data_parkinson_home/baseline_data"
-
 directory_processed_controls = "data_parkinson_home/processed_data/control"
 directory_processed_pd = "data_parkinson_home/processed_data/pd"
 
