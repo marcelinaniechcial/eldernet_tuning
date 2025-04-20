@@ -15,7 +15,7 @@ def load_model(tuned):
     model = torch.hub.load(repo_name, model_name)
 
     if tuned:
-        model.load_state_dict(torch.load("eldernet_tuned_gait.pt", weights_only=True))
+        model.load_state_dict(torch.load("model1.pt", weights_only=True))
 
     model.eval()
 
@@ -69,24 +69,29 @@ def run(with_parkinson: bool) -> None:
     Args:
         with_parkinson (Boolean): True for pd, False for control 
     """
+    test = ["hbv014_MAS.parquet","hbv014_LAS.parquet","hbv072_LAS.parquet","hbv072_MAS.parquet"]
 
     all_true = []
     all_pred = []
 
     if with_parkinson:
-        directory = "data_parkinson_home/processed_data/pd"
+        directory = "data_parkinson_home/processed_data_model1/pd"
     else:
-        directory = "data_parkinson_home/processed_data/control"
+        directory = "data_parkinson_home/processed_data_model1/control"
 
     for f in os.listdir(directory):
         try:
             data = pd.read_parquet(directory + "/" + f)
+
+            if f not in test:
+                continue
+
             input, true_labels = make_windows(data)
             ft_output = main(input)
             predicted_labels = torch.argmax(ft_output, dim=1).cpu().numpy()
 
-            all_true.extend(true_labels)
-            all_pred.extend(predicted_labels)
+            # all_true.extend(true_labels)
+            # all_pred.extend(predicted_labels)
 
             # printing file name and accuracy metrics
             print("Processing file: ",f)
@@ -95,8 +100,8 @@ def run(with_parkinson: bool) -> None:
             print("Could not proccess file: ",f)
             continue
 
-    print("Avarage:")
-    evaluation(all_true,all_pred)
+    # print("Avarage:")
+    # evaluation(all_true,all_pred)
 
 
 if __name__ == "__main__":

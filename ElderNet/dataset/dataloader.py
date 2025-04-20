@@ -5,7 +5,7 @@ import torch
 from torch.utils.data.dataset import Dataset
 from scipy import signal
 from scipy.signal import filtfilt
-from dataset import transformations
+from dataset_model1 import transformations
 import constants
 
 np.random.seed(42)

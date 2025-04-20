@@ -17,7 +17,7 @@ def pd_recognition(data: pd.DataFrame) -> pd.DataFrame:
     return False
 
 
-def drop_gyroscope(data: pd.DataFrame) -> pd.DataFrame:
+def drop_gyroscope(data: pd.DataFrame, to_drop: list) -> pd.DataFrame:
     """Dropping unnecessery data
 
     Args:
@@ -27,7 +27,6 @@ def drop_gyroscope(data: pd.DataFrame) -> pd.DataFrame:
         data (df): data without columns to_drop
     """
 
-    to_drop = ["gyroscope_x","gyroscope_y","gyroscope_z","arm_label","pre_or_post","tremor_label"]
     columns = [column for column in list(data) if column in to_drop]
     
     return data.drop(columns=columns)
@@ -71,6 +70,26 @@ def walking_to_binary(data: pd.DataFrame) -> pd.DataFrame:
 
     return data
 
+def arm_activities_onehot(data: pd.DataFrame) -> pd.DataFrame:
+    """changes free_living_labels into binary encoding where 1 is gait and 0 is non gait
+
+    Args:
+        data (df): time-stamped data for one person with labels
+
+    Returns:
+        data: modified data with bianry-gait column and changed column label
+    """
+
+    # data['free_living_label'] = np.where(
+    #     (data['free_living_label'] == "Walking"), 1, 0)
+    
+    # data['arm_label'] = np.where(
+    #     (data['arm_label'] == "Walking"), 1, 0)
+    
+    # data.columns = ["time", "accelerometer_x", "accelerometer_y", "accelerometer_z", "gait"]
+
+    # return data
+
 def make_windows(data: pd.DataFrame) -> pd.DataFrame:
     """The function splits accelometer data into 300 samples (10s) windows and normalising data
     Each window is labeled 1 if threshold for gait is passed (acceptance_parameter) and 0 otherwise. 
@@ -109,7 +128,7 @@ def make_windows(data: pd.DataFrame) -> pd.DataFrame:
 
     return windows,labels
 
-def process(data: pd.DataFrame) -> pd.DataFrame:
+def process_model1(data: pd.DataFrame) -> pd.DataFrame:
     """This funtion takes raw data and returns processed data. 
     Processing includes dropping uneccessery features, downsampling and one-hot encoding and normalisation 
 
@@ -119,20 +138,41 @@ def process(data: pd.DataFrame) -> pd.DataFrame:
     Returns:
         df: processed data
     """
+    to_drop = ["gyroscope_x","gyroscope_y","gyroscope_z","arm_label","pre_or_post","tremor_label"]
 
-    data = drop_gyroscope(data)
+    data = drop_gyroscope(data, to_drop)
     data = downsample(data)
     data = walking_to_binary(data)
+    return data
+
+
+def process_model2(data: pd.DataFrame) -> pd.DataFrame:
+    """This funtion takes raw data and returns processed data. 
+    Processing includes dropping uneccessery features, downsampling and one-hot encoding and normalisation 
+
+    Args:
+        data (df):  time-stamped data for one person with labels
+
+    Returns:
+        df: processed data
+    """
+    print(data.head(),"hereeee")
+    to_drop = ["gyroscope_x","gyroscope_y","gyroscope_z","pre_or_post","tremor_label"]
+
+    data = drop_gyroscope(data, to_drop)
+    data = downsample(data)
+    data = arm_activities_onehot(data)
 
     return data
 
 
-directory_origin = "data_parkinson_home/baseline_data"
-directory_processed_controls = "data_parkinson_home/processed_data/control"
-directory_processed_pd = "data_parkinson_home/processed_data/pd"
 
-#view example file
-# temp = pd.read_parquet(directory_origin  + "/" + "hbv053_LAS.parquet"))
+directory_origin = "data_parkinson_home/baseline_data"
+directory_processed_controls_model1 = "data_parkinson_home/processed_data_model1/control"
+directory_processed_pd_model1 = "data_parkinson_home/processed_data_model1/pd"
+
+# view example file
+# temp = pd.read_parquet(directory_origin  + "/" + "hbv024_MAS.parquet")
 # print(temp.head())
 
 
@@ -144,10 +184,12 @@ if __name__ == "__main__":
         file = pd.read_parquet(directory_origin + "/" + f)
 
         if pd_recognition(file):
-            directory = directory_processed_pd
+            directory = directory_processed_pd_model1
         else: 
-            directory = directory_processed_controls
+            directory = directory_processed_controls_model1
 
-        processed = process(file)
-        processed.to_parquet(directory + "/" + f)
+     
+
+        processed_model1 = process_model1(file)
+        processed_model1.to_parquet(directory + "/" + f)
 
