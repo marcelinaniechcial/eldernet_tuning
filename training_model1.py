@@ -1,3 +1,4 @@
+from sklearn.utils.class_weight import compute_class_weight
 from dataset_model1 import CustomDataset
 from torch.utils.data import DataLoader
 import pandas as pd
@@ -14,50 +15,58 @@ def load_model():
 
     return model.to(device)
 
-def train(epochs, lr):
+def train(epochs, lr, dataset, train_idx) -> dict:
     """Main training loop
 
     Args:
         epochs (int): number of training epochs 
         lr (float): learning rate
+        dataset (Dataset): whole dataset 
+        train_idx: indicies of train set
     """
-    model = load_model()
-    dataset = CustomDataset()
-    dataloader = DataLoader(dataset,batch_size=1,shuffle=True)
-
-    test = ["hbv014_MAS","hbv014_LAS","hbv072_LAS","hbv072_MAS"]
-
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr = lr)
-
-    for i in range(epochs):
-        for batch in dataloader:
-            
-            # # training only on PD 
-            # if batch["group"]=="control":
-            #     continue
-
-            print(f"Processed file: {batch["study_id"]}")
-            
-            if batch["study_id"] in test:
-                continue
-
-            optimizer.zero_grad()
-            output = model(torch.squeeze(batch["windows"]).float())
-            loss = criterion(output, torch.squeeze(batch["labels"]))
-            loss.backward()
-            optimizer.step()
-        
-    torch.save(model.state_dict(), "eldernet_tuned_gait.pt")
-    print("Model sucessfully saved")
-    
-if __name__=="__main__":
-
     np.random.seed(42)
     torch.manual_seed(42)
+    model = load_model()
+    optimizer = torch.optim.Adam(model.parameters(), lr = lr)
 
-    epochs = 1
-    learning_rate = 0.001
-    train(epochs, learning_rate)
+  
+    #adjusting weight to balance classes 
+    #did NOT work well, overcompensated minority class
+
+    # all_train_labels = []
+    # for i in train_idx:
+    #     all_train_labels.extend(dataset[i]["labels"].flatten().tolist())
+
+    # weights = compute_class_weight(class_weight="balanced", classes=np.unique(all_train_labels), y = all_train_labels)
+    # weights = weights/weights.sum()
+    # weights = torch.tensor(weights,dtype=torch.float)
+    # criterion = torch.nn.CrossEntropyLoss(weight=weights)
+
+    criterion = torch.nn.CrossEntropyLoss()
+
+    for i in range(epochs):
+        print(f"Epoch {i}")
+
+        train_idx = np.random.permutation(train_idx)
+        training_sampler = torch.utils.data.SubsetRandomSampler(train_idx)
+        dataloader = DataLoader(dataset, batch_size=1, sampler=training_sampler)
+
+        for batch in dataloader:
+
+            print(f"Processing file: {batch["study_id"]}")
+
+            windows = batch["windows"].squeeze(0).float()
+            labels = batch["labels"].squeeze(0)
+
+            optimizer.zero_grad()
+            output = model(windows)
+            loss = criterion(output, labels)
+            loss.backward()
+            optimizer.step()
+
+            print(f"Loss:{loss}")
+    
+    return model.state_dict()
+    
 
    

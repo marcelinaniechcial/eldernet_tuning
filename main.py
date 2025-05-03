@@ -1,5 +1,8 @@
 
-from data_parkinson_home.data_processing import make_windows
+from sklearn.model_selection import KFold
+from dataset_model1 import CustomDataset
+from torch.utils.data import DataLoader
+from training_model1 import train
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import numpy as np
 import torch
@@ -7,25 +10,23 @@ import os
 import pandas as pd
 
 
-def load_model(tuned):
+def load_model(tuned, parameters):
 
     model_name = "eldernet_ft"
     repo_name = 'yonbrand/ElderNet'
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = torch.hub.load(repo_name, model_name)
 
     if tuned:
-        model.load_state_dict(torch.load("model1.pt", weights_only=True))
-
+        model.load_state_dict(torch.load(parameters, weights_only=True,map_location=device))
     model.eval()
-
     return model.to(device)
 
-def main(input) -> torch.tensor:
+def eval(input, model) -> torch.tensor:
     """The function uses loaded model to clasify occurance of gait
 
     Args:
         input (np.array): accelometer data as 10s windows 
+        model : loaded model which should be used to make predictions
 
     Returns:
         1-D tensor : prediction of gait for each window 
@@ -34,14 +35,10 @@ def main(input) -> torch.tensor:
     repo_name = 'yonbrand/ElderNet'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # Generate sample data (10 seconds window, 30Hz sampling rate)
     x = torch.FloatTensor(input).to(device)
 
-    ft_model = load_model(True)
-
-
     with torch.no_grad():
-        ft_output = ft_model(x)
+        ft_output = model(x)
 
     print(f"Fine-tuned Model Output Shape: {ft_output.shape}")
 
@@ -62,52 +59,75 @@ def evaluation(true,predicted) -> None:
     print("Non-gait vs gait model: ", np.bincount(predicted))
 
 
-def run(with_parkinson: bool) -> None:
-    """This function runs model on parkinson patients (true) or control group (False).
-      The function prints accuracy metrics for each file and for whole dataset
+def test(dataset, device, file, test_idx):
+
+    model = load_model(True, f"cross_validation_models/fold_{file}.pt") 
+    test_sampler = torch.utils.data.SubsetRandomSampler(test_idx)
+    dataloader = DataLoader(dataset, batch_size=1, sampler=test_sampler)
+
+    accuracy = []
+    sensitivity = []
+    specificity = []
+
+    for batch in dataloader:
+        print(f"Testing file: {batch["study_id"] }")
+
+        windows = (batch["windows"].squeeze(0)).float()
+        y_true =  (batch["labels"].squeeze(0)).numpy()
+
+        output = eval(windows,model)
+
+        #model output to binary classification
+        y_pred = (torch.argmax(output, dim=1).to(device)).numpy()
+
+
+        #printing 
+        evaluation(y_true, y_pred)
+
+        accuracy.append(accuracy_score(y_true,y_pred))
+        sensitivity.append(recall_score(y_true,y_pred))
+        specificity.append(recall_score(y_true, y_pred, pos_label=0))
+
+    return accuracy, sensitivity, specificity
+    
+
+
+def run(dataset, device) -> tuple:
+    """This function is used for n-fold cross validation
 
     Args:
-        with_parkinson (Boolean): True for pd, False for control 
+        dataset (Dataset): pytorch custom dataset 
+        device : pytorch device setting
+
     """
-    test = ["hbv014_MAS.parquet","hbv014_LAS.parquet","hbv072_LAS.parquet","hbv072_MAS.parquet"]
 
-    all_true = []
-    all_pred = []
+    kf = KFold(n_splits=10,shuffle=True)
 
-    if with_parkinson:
-        directory = "data_parkinson_home/processed_data_model1/pd"
-    else:
-        directory = "data_parkinson_home/processed_data_model1/control"
+    all_acc = []
+    all_sens = []
+    all_spec = []
 
-    for f in os.listdir(directory):
-        try:
-            data = pd.read_parquet(directory + "/" + f)
+    for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
+        print(f"fold: {fold}, Training: {train_idx}, Testing: {test_idx}")
 
-            if f not in test:
-                continue
+        parameters = train(5, 0.001, dataset, train_idx)
+        
+        torch.save(parameters, f"cross_validation_models/fold_{fold}.pt")
 
-            input, true_labels = make_windows(data)
-            ft_output = main(input)
-            predicted_labels = torch.argmax(ft_output, dim=1).cpu().numpy()
+        # make array for all metrics 
+        acc, sens, spec = test(dataset, device, fold, test_idx)
 
-            # all_true.extend(true_labels)
-            # all_pred.extend(predicted_labels)
-
-            # printing file name and accuracy metrics
-            print("Processing file: ",f)
-            evaluation(true_labels,predicted_labels)
-        except:
-            print("Could not proccess file: ",f)
-            continue
-
-    # print("Avarage:")
-    # evaluation(all_true,all_pred)
-
-
+        all_acc.extend(acc)
+        all_sens.extend(sens)
+        all_spec.extend(spec)
+    
+    return all_acc, all_sens, all_spec
+        
 if __name__ == "__main__":
-
     np.random.seed(42)
     torch.manual_seed(42)
 
     #test model 
-    run(True)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dataset = CustomDataset()
+    run(dataset,device)
