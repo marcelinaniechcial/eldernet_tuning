@@ -1,5 +1,5 @@
 from sklearn.utils.class_weight import compute_class_weight
-from dataset_model1 import CustomDataset
+from eldernet_tuning.dataloader import CustomDataset
 from torch.utils.data import DataLoader
 import pandas as pd
 import numpy as np
