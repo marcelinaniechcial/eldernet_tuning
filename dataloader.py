@@ -3,7 +3,7 @@ import pandas as pd
 from torch.utils.data import Dataset
 from data_parkinson_home.data_processing import make_windows
 
-class CustomDataset(Dataset):
+class DatasetWalking(Dataset):
     def __init__(self):
         self.data = []
 
@@ -17,6 +17,13 @@ class CustomDataset(Dataset):
                 group = "control"
             
             for f in os.listdir(file_path):
+                # small datavbse for testing
+                files1 = [ "hbv058_LAS.parquet", "hbv058_MAS.parquet","hbv002_LAS.parquet","hbv002_MAS.parquet", "hbv022_MAS.parquet"]
+                if str(f) in files1:
+                    pass
+                else:
+                    continue
+
                 side = "LAS"
                 if "MAS" in f:
                     side = "MAS"
