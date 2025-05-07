@@ -17,6 +17,7 @@ def load_model():
 
     return model.to(device)
 
+
 def train(epochs, lr, dataset, train_idx) -> dict:
     """Main training loop
 
@@ -54,24 +55,25 @@ def train(epochs, lr, dataset, train_idx) -> dict:
         dataloader = DataLoader(dataset, batch_size=1, sampler=training_sampler)
 
         for batch in dataloader:
+            # each batch has 2 files for MAS and LAS
+            for j in range(len(batch)):
+                print(f"Processing file: {batch[j]["study_id"]}, {batch[j]["side"]}")
 
-            print(f"Processing file: {batch["study_id"]}")
+                windows = batch[j]["windows"].squeeze(0).float()
+                labels = batch[j]["labels"].squeeze(0)
 
-            windows = batch["windows"].squeeze(0).float()
-            labels = batch["labels"].squeeze(0)
+                optimizer.zero_grad()
+                output = model(windows)
+                loss = criterion(output, labels)
+                loss.backward()
+                optimizer.step()
 
-            optimizer.zero_grad()
-            output = model(windows)
-            loss = criterion(output, labels)
-            loss.backward()
-            optimizer.step()
-
-            print(f"Loss:{loss}")
+                print(f"Loss:{loss}")
     
     return model.state_dict()
     
 
-def run_cross_validation(dataset, n_splits) -> tuple:
+def run_cross_validation(dataset, n) -> tuple:
     """This function is used for n-fold cross validation
 
     Args:
@@ -80,19 +82,20 @@ def run_cross_validation(dataset, n_splits) -> tuple:
 
     """
 
-    kf = KFold(n_splits=n_splits,shuffle=True)
+    kf = KFold(n_splits=n,shuffle=True)
     #saves indicies of test data and number of folds
     splits = {}
-    splits["folds"] = n_splits
+    splits["folds"] = n
 
     path_models = os.path.join(os.path.dirname(__file__),"cross_validation_models")
     
     for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
+
         print(f"fold: {fold}, Training: {train_idx}, Testing: {test_idx}")
 
         splits[fold] = test_idx.tolist()
 
-        parameters = train(1, 0.0001, dataset, train_idx)
+        parameters = train(5, 0.0001, dataset, train_idx)
         
         torch.save(parameters, f"{path_models}/{fold}.pt")
 
@@ -101,6 +104,8 @@ def run_cross_validation(dataset, n_splits) -> tuple:
     with open(path_splits, "w") as f:
             json.dump(splits, f) 
 
+    print("Models sucessfully saved")
+
 if __name__=="__main__":
     dataset = DatasetWalking()
-    run_cross_validation(dataset,2)
+    run_cross_validation(dataset,3)
