@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J eldernet_tuning
 #SBATCH -N 1    
-#SBATCH -p gpu
+#SBATCH -p gpu_a100
 #SBATCH -t 00:01:00
 #SBATCH --gpus-per-node=1
 #SBATCH -o logs/output.%j.out
