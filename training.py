@@ -101,7 +101,7 @@ def run_cross_validation(dataset, n, device) -> tuple:
 
         splits[fold] = test_idx.tolist()
 
-        parameters = train(10, 0.00001, dataset, train_idx, device)
+        parameters = train(10, 0.00005, dataset, train_idx, device)
         
         torch.save(parameters, f"{path_models}/{fold}.pt")
 
