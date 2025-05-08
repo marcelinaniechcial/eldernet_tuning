@@ -8,17 +8,25 @@ import numpy as np
 import torch
 import os
 
-def load_model():
+
+
+def load_model_training(device):
     model_name = "eldernet_ft"
     repo_name = 'yonbrand/ElderNet'
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = torch.hub.load(repo_name, model_name)
     model.train()
 
     return model.to(device)
 
+def collate(batch):
 
-def train(epochs, lr, dataset, train_idx) -> dict:
+    flat = []
+    for x in batch:
+        flat.extend(x)
+
+    return flat
+
+def train(epochs, lr, dataset, train_idx, device) -> dict:
     """Main training loop
 
     Args:
@@ -29,7 +37,7 @@ def train(epochs, lr, dataset, train_idx) -> dict:
     """
     np.random.seed(42)
     torch.manual_seed(42)
-    model = load_model()
+    model = load_model_training(device)
     optimizer = torch.optim.Adam(model.parameters(), lr = lr)
 
   
@@ -50,17 +58,14 @@ def train(epochs, lr, dataset, train_idx) -> dict:
     for i in range(epochs):
         print(f"Epoch {i}")
 
-        train_idx = np.random.permutation(train_idx)
         training_sampler = torch.utils.data.SubsetRandomSampler(train_idx)
-        dataloader = DataLoader(dataset, batch_size=1, sampler=training_sampler)
+        dataloader = DataLoader(dataset, batch_size=5, sampler=training_sampler, collate_fn=collate)
 
         for batch in dataloader:
             # each batch has 2 files for MAS and LAS
             for j in range(len(batch)):
-                print(f"Processing file: {batch[j]["study_id"]}, {batch[j]["side"]}")
-
-                windows = batch[j]["windows"].squeeze(0).float()
-                labels = batch[j]["labels"].squeeze(0)
+                windows = torch.tensor(batch[j]["windows"]).float().to(device)
+                labels = torch.tensor(batch[j]["labels"]).to(device)
 
                 optimizer.zero_grad()
                 output = model(windows)
@@ -73,7 +78,7 @@ def train(epochs, lr, dataset, train_idx) -> dict:
     return model.state_dict()
     
 
-def run_cross_validation(dataset, n) -> tuple:
+def run_cross_validation(dataset, n, device) -> tuple:
     """This function is used for n-fold cross validation
 
     Args:
@@ -95,7 +100,7 @@ def run_cross_validation(dataset, n) -> tuple:
 
         splits[fold] = test_idx.tolist()
 
-        parameters = train(5, 0.0001, dataset, train_idx)
+        parameters = train(25, 0.00005, dataset, train_idx, device)
         
         torch.save(parameters, f"{path_models}/{fold}.pt")
 
@@ -107,5 +112,6 @@ def run_cross_validation(dataset, n) -> tuple:
     print("Models sucessfully saved")
 
 if __name__=="__main__":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = DatasetWalking()
-    run_cross_validation(dataset,3)
+    run_cross_validation(dataset,3, device)

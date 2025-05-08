@@ -81,7 +81,7 @@ def get_probabilities(dataset, fold, idx):
         for i in range(len(subject)):
 
             batch = subject[i]
-            print(f"Testing file: {batch["study_id"]}, {batch["side"]}")
+            # print(f"Testing file: {batch["study_id"]}, {batch["side"]}")
 
             windows = (batch["windows"].squeeze(0)).float()
             y_true =  (batch["labels"].squeeze(0)).numpy()
@@ -132,7 +132,7 @@ def run_evaluations():
     for fold in range(k):
         test_idx = data[str(fold)] 
         for index in  test_idx:
-            print("fold",fold,",Indexes to test ",test_idx,"Current",index)
+            # print("fold",fold,",Indexes to test ",test_idx,"Current",index)
             treshold = tresholds[str(fold)]
             probabilities, labels = get_probabilities(dataset, fold, [index])
             results1 = get_metrics(treshold, probabilities[0], labels[0])
