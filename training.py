@@ -93,14 +93,15 @@ def run_cross_validation(dataset, n, device) -> tuple:
     splits["folds"] = n
 
     path_models = os.path.join(os.path.dirname(__file__),"cross_validation_models")
+    os.makedirs(path_models,exist_ok=True)
     
     for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
 
-        print(f"fold: {fold}, Training: {train_idx}, Testing: {test_idx}")
+        # print(f"fold: {fold}, Training: {train_idx}, Testing: {test_idx}")
 
         splits[fold] = test_idx.tolist()
 
-        parameters = train(25, 0.00005, dataset, train_idx, device)
+        parameters = train(1, 0.00005, dataset, train_idx, device)
         
         torch.save(parameters, f"{path_models}/{fold}.pt")
 
