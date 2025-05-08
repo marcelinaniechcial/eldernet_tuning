@@ -21,11 +21,11 @@ class DatasetWalking(Dataset):
 
             for f in os.listdir(file_path):
                 # small datavbse for testing
-                files1 = [ "hbv058_LAS.parquet","hbv002_LAS.parquet","hbv058_MAS.parquet","hbv002_MAS.parquet", "hbv022_LAS.parquet", "hbv022_MAS.parquet"]
-                if str(f) in files1:
-                    pass
-                else:
-                    continue    
+                # files1 = [ "hbv058_LAS.parquet","hbv002_LAS.parquet","hbv058_MAS.parquet","hbv002_MAS.parquet", "hbv022_LAS.parquet", "hbv022_MAS.parquet"]
+                # if str(f) in files1:
+                #     pass
+                # else:
+                #     continue    
                 study_id = f[:6]
                 if positions.get(study_id, -1) == -1:
                     positions[study_id] = counter
