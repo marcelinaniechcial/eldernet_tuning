@@ -1,4 +1,3 @@
-#Set job requirements
 #!/bin/bash
 #SBATCH -J eldernet_tuning
 #SBATCH -N 1    
