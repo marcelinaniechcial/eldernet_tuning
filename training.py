@@ -39,27 +39,13 @@ def train(epochs, lr, dataset, train_idx, device) -> dict:
     torch.manual_seed(42)
     model = load_model_training(device)
     optimizer = torch.optim.Adam(model.parameters(), lr = lr)
-
-  
-    #adjusting weight to balance classes 
-    #did NOT work well, overcompensated minority class
-
-    # all_train_labels = []
-    # for i in train_idx:
-    #     all_train_labels.extend(dataset[i]["labels"].flatten().tolist())
-
-    # weights = compute_class_weight(class_weight="balanced", classes=np.unique(all_train_labels), y = all_train_labels)
-    # weights = weights/weights.sum()
-    # weights = torch.tensor(weights,dtype=torch.float)
-    # criterion = torch.nn.CrossEntropyLoss(weight=weights)
-
     criterion = torch.nn.CrossEntropyLoss()
 
     for i in range(epochs):
         print(f"Epoch {i}")
 
         training_sampler = torch.utils.data.SubsetRandomSampler(train_idx)
-        dataloader = DataLoader(dataset, batch_size=5, sampler=training_sampler, collate_fn=collate)
+        dataloader = DataLoader(dataset, batch_size=1, sampler=training_sampler, collate_fn=collate)
 
         for batch in dataloader:
             # each batch has 2 files for MAS and LAS
@@ -101,7 +87,7 @@ def run_cross_validation(dataset, n, device) -> tuple:
 
         splits[fold] = test_idx.tolist()
 
-        parameters = train(10, 0.00005, dataset, train_idx, device)
+        parameters = train(10, 0.00001, dataset, train_idx, device)
         
         torch.save(parameters, f"{path_models}/{fold}.pt")
 
@@ -115,4 +101,4 @@ def run_cross_validation(dataset, n, device) -> tuple:
 if __name__=="__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = DatasetWalking()
-    run_cross_validation(dataset,3, device)
+    run_cross_validation(dataset, len(dataset) , device)
