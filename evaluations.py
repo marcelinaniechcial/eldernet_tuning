@@ -205,6 +205,6 @@ if __name__ == "__main__":
     dataset = DatasetWalking()
 
     set_treshold()
-    # run_evaluations()
+    run_evaluations()
 
 
