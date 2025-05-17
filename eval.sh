@@ -12,4 +12,4 @@ module load 2023
 module load Anaconda3/2023.07-2
 conda activate /projects/0/einf2658/users/mniechcial/envs/myenv
 
-python -u evaluation.py 
+python -u evaluations.py 
