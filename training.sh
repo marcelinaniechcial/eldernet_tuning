@@ -5,6 +5,7 @@
 #SBATCH -t 10:00:00
 #SBATCH --gpus-per-node=1
 #SBATCH -o logs/output.%j.out
+#SBATCH --tasks-per-node 1
 
 #Loading modules
 

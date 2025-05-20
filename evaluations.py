@@ -7,7 +7,7 @@ from sklearn import metrics
 from dataloader import DatasetWalking
 from torch.utils.data import DataLoader
 from training import train
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, precision_recall_curve
 import numpy as np
 import torch
 import json
@@ -63,6 +63,22 @@ def auc(probabilities,labels, plot):
 
     return auc
 
+def precision_recall(probabilities, labels, plot):
+    y_scores = np.array(probabilities)[:,1].squeeze()
+    y_true = np.array(labels)
+
+    precision, recall, thresholds = precision_recall_curve(y_true,y_scores)
+
+    if plot:
+        plt.figure()  
+        plt.plot(recall, precision, color="red", label="Precision-Recall curve")
+        plt.title(f"Precision-Recall curve (Tuned Eldernet)")
+        plt.xlabel("Recall")
+        plt.ylabel("Precision")
+        plt.legend()
+        plt.show()
+
+    return None
 
 def get_probabilities(dataset, fold, idx):
 
@@ -151,6 +167,7 @@ def run_evaluations():
         json.dump(results, file)
 
     auc(all_probabilities,all_labels,True)
+    precision_recall(all_probabilities,all_labels,True)
 
 
 def set_treshold():
@@ -204,7 +221,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = DatasetWalking()
 
-    set_treshold()
+    # set_treshold()
     run_evaluations()
 
 
