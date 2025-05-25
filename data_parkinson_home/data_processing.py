@@ -107,7 +107,10 @@ def make_windows(data: pd.DataFrame) -> pd.DataFrame:
     acceptance_parameter = 0.5
     accelerometer = ["accelerometer_x", "accelerometer_y", "accelerometer_z"]
     # normalising
-    data[accelerometer] = (data[accelerometer]-data[accelerometer].mean())/data[accelerometer].std()
+    # print(data.head())
+    # data[accelerometer] = (data[accelerometer]-data[accelerometer].mean())/data[accelerometer].std()
+    # print("Normalized")
+    # print(data.head())
     input = data[accelerometer].values
     output = data["gait"].values
 
@@ -179,17 +182,23 @@ directory_processed_pd_model1 = "data_parkinson_home/processed_data_model1/pd"
 #loading and processing data
 if __name__ == "__main__":
 
-    for f in os.listdir(directory_origin):
+    # for f in os.listdir(directory_origin):
 
-        file = pd.read_parquet(directory_origin + "/" + f)
+    #     file = pd.read_parquet(directory_origin + "/" + f)
 
-        if pd_recognition(file):
-            directory = directory_processed_pd_model1
-        else: 
-            directory = directory_processed_controls_model1
+    #     if pd_recognition(file):
+    #         directory = directory_processed_pd_model1
+    #     else: 
+    #         directory = directory_processed_controls_model1
 
      
 
-        processed_model1 = process_model1(file)
-        processed_model1.to_parquet(directory + "/" + f)
+    #     processed_model1 = process_model1(file)
+    #     processed_model1.to_parquet(directory + "/" + f)
+
+    temp = pd.read_parquet(directory_processed_pd_model1  + "/" + "hbv002_LAS.parquet")
+    print(temp)
+
+    temp = pd.read_parquet(directory_origin  + "/" + "hbv002_LAS.parquet")
+    print(temp)
 

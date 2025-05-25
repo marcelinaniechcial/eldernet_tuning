@@ -83,11 +83,11 @@ def run_cross_validation(dataset, n, device) -> tuple:
     
     for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
 
-        # print(f"fold: {fold}, Training: {train_idx}, Testing: {test_idx}")
+        print(f"fold: {fold}, Training: {train_idx}, Testing: {test_idx}")
 
         splits[fold] = test_idx.tolist()
 
-        parameters = train(30, 0.0001, dataset, train_idx, device)
+        parameters = train(10, 0.00001, dataset, train_idx, device)
         
         torch.save(parameters, f"{path_models}/{fold}.pt")
 

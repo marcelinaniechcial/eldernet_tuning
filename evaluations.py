@@ -106,7 +106,7 @@ def get_probabilities(dataset, fold, idx):
 
             #model output to binary classification
 
-            y_pred = (torch.nn.functional.softmax(output, dim=1).to(device)).numpy().squeeze()
+            y_pred = (torch.nn.functional.softmax(output, dim=1).to(device)).cpu().numpy().squeeze()
 
             all_probs.append(y_pred)
             all_labels.append(y_true)
@@ -184,7 +184,6 @@ def set_treshold():
     for fold in range(k):
         test_idx = data[str(fold)] 
         train_idx = [i for i in range(len(dataset)) if i not in test_idx]
-        print(train_idx)
 
         probabilities, labels = get_probabilities(dataset, fold, train_idx)
 
@@ -221,7 +220,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = DatasetWalking()
 
-    # set_treshold()
+    set_treshold()
     run_evaluations()
 
 
