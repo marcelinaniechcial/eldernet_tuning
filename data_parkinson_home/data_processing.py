@@ -108,7 +108,7 @@ def make_windows(data: pd.DataFrame) -> pd.DataFrame:
     accelerometer = ["accelerometer_x", "accelerometer_y", "accelerometer_z"]
     # normalising
     # print(data.head())
-    # data[accelerometer] = (data[accelerometer]-data[accelerometer].mean())/data[accelerometer].std()
+    data[accelerometer] = (data[accelerometer]-data[accelerometer].mean())/data[accelerometer].std()
     # print("Normalized")
     # print(data.head())
     input = data[accelerometer].values
