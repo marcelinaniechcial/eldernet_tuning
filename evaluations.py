@@ -182,7 +182,7 @@ def set_treshold():
     all_tresholds = {}
 
     for fold in range(k):
-        test_idx = data[str(fold)] 
+        test_idx = data[str(fold)]
         train_idx = [i for i in range(len(dataset)) if i not in test_idx]
 
         probabilities, labels = get_probabilities(dataset, fold, train_idx)

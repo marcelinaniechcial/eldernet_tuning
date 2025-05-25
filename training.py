@@ -1,4 +1,5 @@
 from sklearn.utils.class_weight import compute_class_weight
+import torch.optim.lr_scheduler as lr_scheduler
 from dataloader import DatasetWalking
 from sklearn.model_selection import KFold
 import json
@@ -38,15 +39,25 @@ def train(epochs, lr, dataset, train_idx, device) -> dict:
     np.random.seed(42)
     torch.manual_seed(42)
     model = load_model_training(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr = lr)
-    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr = lr, weight_decay=1e-5)
+    # criterion = torch.nn.CrossEntropyLoss()
+
+    all_train_labels = []
+    for i in train_idx:
+        all_train_labels.extend(dataset[i][0]["labels"].flatten().tolist())
+        all_train_labels.extend(dataset[i][1]["labels"].flatten().tolist())
+
+    weights = compute_class_weight(class_weight="balanced", classes=np.unique(all_train_labels), y = all_train_labels)
+    weights = torch.tensor(weights,dtype=torch.float)
+    criterion = torch.nn.CrossEntropyLoss(weight=weights)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
+
 
     for i in range(epochs):
         print(f"Epoch {i}")
 
         training_sampler = torch.utils.data.SubsetRandomSampler(train_idx)
         dataloader = DataLoader(dataset, batch_size=1, sampler=training_sampler, collate_fn=collate)
-
         for batch in dataloader:
             # each batch has 2 files for MAS and LAS
             for j in range(len(batch)):
@@ -58,8 +69,9 @@ def train(epochs, lr, dataset, train_idx, device) -> dict:
                 loss = criterion(output, labels)
                 loss.backward()
                 optimizer.step()
-
                 print(f"Loss:{loss}")
+        scheduler.step()
+
     
     return model.state_dict()
     
@@ -80,14 +92,14 @@ def run_cross_validation(dataset, n, device) -> tuple:
 
     path_models = os.path.join(os.path.dirname(__file__),"cross_validation_models")
     os.makedirs(path_models,exist_ok=True)
-    
+
     for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
 
         print(f"fold: {fold}, Training: {train_idx}, Testing: {test_idx}")
 
         splits[fold] = test_idx.tolist()
 
-        parameters = train(10, 0.00001, dataset, train_idx, device)
+        parameters = train(15, 0.001, dataset, train_idx, device)
         
         torch.save(parameters, f"{path_models}/{fold}.pt")
 

@@ -114,6 +114,8 @@ def make_windows(data: pd.DataFrame) -> pd.DataFrame:
     input = data[accelerometer].values
     output = data["gait"].values
 
+    
+
     for i in range(0,data.shape[0]-300,300):
 
         window = input[i:i+300,:].T 
