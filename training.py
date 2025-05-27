@@ -20,8 +20,8 @@ class Windows(Dataset):
         return self.windows.shape[0]
     
     def __getitem__(self, index):
-        window = torch.tensor(self.windows[index], dtype=torch.float32)
-        label = torch.tensor(self.labels[index], dtype=torch.long)
+        window = torch.tensor(self.windows[index], dtype=torch.float32).to(device)
+        label = torch.tensor(self.labels[index], dtype=torch.long).to(device)
         return window,label
 
     
@@ -63,9 +63,9 @@ def train(epochs, lr, dataset, train_idx, batch_size, device) -> dict:
     all_train_windows, all_train_labels = shuffle(all_train_windows,all_train_labels, random_state=42)
 
     weights = compute_class_weight(class_weight="balanced", classes=np.unique(all_train_labels), y = all_train_labels)
-    weights = torch.tensor(weights,dtype=torch.float)
+    weights = torch.tensor(weights,dtype=torch.float).to(device)
     criterion = torch.nn.CrossEntropyLoss(weight=weights)
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.7)
 
     windows_dataset = Windows(all_train_windows,all_train_labels)
     windows_loader = DataLoader(windows_dataset, batch_size=batch_size, shuffle=True)
@@ -80,6 +80,7 @@ def train(epochs, lr, dataset, train_idx, batch_size, device) -> dict:
             loss = criterion(output, labels)
             loss.backward()
             optimizer.step()
+            print(loss)
             
         scheduler.step()
 
