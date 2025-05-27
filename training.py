@@ -1,15 +1,30 @@
 from sklearn.utils.class_weight import compute_class_weight
 import torch.optim.lr_scheduler as lr_scheduler
 from dataloader import DatasetWalking
+from sklearn.utils import shuffle
 from sklearn.model_selection import KFold
 import json
+from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import pandas as pd
 import numpy as np
 import torch
 import os
 
+class Windows(Dataset):
+    def __init__(self, windows, labels):
+        self.windows = windows
+        self.labels = labels 
 
+    def __len__(self):
+        return self.windows.shape[0]
+    
+    def __getitem__(self, index):
+        window = torch.tensor(self.windows[index], dtype=torch.float32)
+        label = torch.tensor(self.labels[index], dtype=torch.long)
+        return window,label
+
+    
 
 def load_model_training(device):
     model_name = "eldernet_ft"
@@ -19,15 +34,7 @@ def load_model_training(device):
 
     return model.to(device)
 
-def collate(batch):
-
-    flat = []
-    for x in batch:
-        flat.extend(x)
-
-    return flat
-
-def train(epochs, lr, dataset, train_idx, device) -> dict:
+def train(epochs, lr, dataset, train_idx, batch_size, device) -> dict:
     """Main training loop
 
     Args:
@@ -39,44 +46,50 @@ def train(epochs, lr, dataset, train_idx, device) -> dict:
     np.random.seed(42)
     torch.manual_seed(42)
     model = load_model_training(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr = lr, weight_decay=1e-5)
-    # criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr = lr, weight_decay=5e-5)
 
     all_train_labels = []
+    all_train_windows = []
+
     for i in train_idx:
+        all_train_windows.append(dataset[i][0]["windows"])
+        all_train_windows.append(dataset[i][1]["windows"])
+
         all_train_labels.extend(dataset[i][0]["labels"].flatten().tolist())
         all_train_labels.extend(dataset[i][1]["labels"].flatten().tolist())
+
+    all_train_windows = np.concatenate(all_train_windows,axis=0)
+
+    all_train_windows, all_train_labels = shuffle(all_train_windows,all_train_labels, random_state=42)
 
     weights = compute_class_weight(class_weight="balanced", classes=np.unique(all_train_labels), y = all_train_labels)
     weights = torch.tensor(weights,dtype=torch.float)
     criterion = torch.nn.CrossEntropyLoss(weight=weights)
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
 
+    windows_dataset = Windows(all_train_windows,all_train_labels)
+    windows_loader = DataLoader(windows_dataset, batch_size=batch_size, shuffle=True)
 
     for i in range(epochs):
         print(f"Epoch {i}")
 
-        training_sampler = torch.utils.data.SubsetRandomSampler(train_idx)
-        dataloader = DataLoader(dataset, batch_size=1, sampler=training_sampler, collate_fn=collate)
-        for batch in dataloader:
-            # each batch has 2 files for MAS and LAS
-            for j in range(len(batch)):
-                windows = torch.tensor(batch[j]["windows"]).float().to(device)
-                labels = torch.tensor(batch[j]["labels"]).to(device)
-
-                optimizer.zero_grad()
-                output = model(windows)
-                loss = criterion(output, labels)
-                loss.backward()
-                optimizer.step()
-                print(f"Loss:{loss}")
+        for windows,labels in windows_loader:
+            
+            optimizer.zero_grad()
+            output = model(windows)
+            loss = criterion(output, labels)
+            loss.backward()
+            optimizer.step()
+            
         scheduler.step()
+
+        print(f"Loss:{loss}")
 
     
     return model.state_dict()
     
 
-def run_cross_validation(dataset, n, device) -> tuple:
+def run_cross_validation(dataset, n, epochs, batch_size, lr, device) -> tuple:
     """This function is used for n-fold cross validation
 
     Args:
@@ -99,7 +112,7 @@ def run_cross_validation(dataset, n, device) -> tuple:
 
         splits[fold] = test_idx.tolist()
 
-        parameters = train(10, 0.0001, dataset, train_idx, device)
+        parameters = train(epochs, lr, dataset, train_idx, batch_size, device)
         
         torch.save(parameters, f"{path_models}/{fold}.pt")
 
@@ -112,5 +125,9 @@ def run_cross_validation(dataset, n, device) -> tuple:
 
 if __name__=="__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("GPU",torch.cuda.is_available())
     dataset = DatasetWalking()
-    run_cross_validation(dataset, len(dataset) , device)
+    batch_size = 32
+    epochs = 15
+    lr = 0.0001
+    run_cross_validation(dataset, len(dataset), epochs, batch_size, lr, device)

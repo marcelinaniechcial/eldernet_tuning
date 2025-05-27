@@ -12,7 +12,6 @@ import numpy as np
 import torch
 import json
 
-
 def load_trained_model( parameters):
 
     model_name = "eldernet_ft"
