@@ -80,7 +80,6 @@ def train(epochs, lr, dataset, train_idx, batch_size, device) -> dict:
             loss = criterion(output, labels)
             loss.backward()
             optimizer.step()
-            print(loss)
             
         scheduler.step()
 
@@ -129,6 +128,6 @@ if __name__=="__main__":
     print("GPU",torch.cuda.is_available())
     dataset = DatasetWalking()
     batch_size = 32
-    epochs = 15
+    epochs = 20
     lr = 0.0001
     run_cross_validation(dataset, len(dataset), epochs, batch_size, lr, device)
