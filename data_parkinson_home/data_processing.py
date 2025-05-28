@@ -32,7 +32,7 @@ def drop_gyroscope(data: pd.DataFrame, to_drop: list) -> pd.DataFrame:
     return data.drop(columns=columns)
 
 
-def downsample(data: pd.DataFrame) -> pd.DataFrame:
+def downsample(data: pd.DataFrame, label_column) -> pd.DataFrame:
     """Downsampling data to 30HZ by interpolation for float values and nearest label for string values (free_living_label)
 
     Args:
@@ -48,7 +48,7 @@ def downsample(data: pd.DataFrame) -> pd.DataFrame:
 
     sampled_data = pd.DataFrame(cs(sampled_time),columns=accelerometer)
     sampled_data.insert(0, "time", sampled_time)
-    sampled_data = pd.merge_asof(sampled_data, data[["time", "free_living_label"]], on="time", direction="nearest")
+    sampled_data = pd.merge_asof(sampled_data, data[["time", label_column]], on="time", direction="nearest")
 
     return sampled_data
 
@@ -70,7 +70,7 @@ def walking_to_binary(data: pd.DataFrame) -> pd.DataFrame:
 
     return data
 
-def arm_activities_onehot(data: pd.DataFrame) -> pd.DataFrame:
+def arm_activities_labeling(data: pd.DataFrame) -> pd.DataFrame:
     """changes free_living_labels into binary encoding where 1 is gait and 0 is non gait
 
     Args:
@@ -80,15 +80,14 @@ def arm_activities_onehot(data: pd.DataFrame) -> pd.DataFrame:
         data: modified data with bianry-gait column and changed column label
     """
 
-    # data['free_living_label'] = np.where(
-    #     (data['free_living_label'] == "Walking"), 1, 0)
-    
-    # data['arm_label'] = np.where(
-    #     (data['arm_label'] == "Walking"), 1, 0)
-    
-    # data.columns = ["time", "accelerometer_x", "accelerometer_y", "accelerometer_z", "gait"]
+    data['arm_label'] = np.where(
+        (data['arm_label'] == "non_gait"), 0,
+        np.where((data['arm_label'] == "Gait without other behaviours or other positions"),1,2))
 
-    # return data
+    
+    data.columns = ["time", "accelerometer_x", "accelerometer_y", "accelerometer_z", "gait_arms_activities"]
+
+    return data
 
 def make_windows(data: pd.DataFrame) -> pd.DataFrame:
     """The function splits accelometer data into 300 samples (10s) windows and normalising data
@@ -106,15 +105,9 @@ def make_windows(data: pd.DataFrame) -> pd.DataFrame:
     labels = []
     acceptance_parameter = 0.5
     accelerometer = ["accelerometer_x", "accelerometer_y", "accelerometer_z"]
-    # normalising
-    # print(data.head())
     data[accelerometer] = (data[accelerometer]-data[accelerometer].mean())/data[accelerometer].std()
-    # print("Normalized")
-    # print(data.head())
     input = data[accelerometer].values
     output = data["gait"].values
-
-    
 
     for i in range(0,data.shape[0]-300,300):
 
@@ -144,9 +137,10 @@ def process_model1(data: pd.DataFrame) -> pd.DataFrame:
         df: processed data
     """
     to_drop = ["gyroscope_x","gyroscope_y","gyroscope_z","arm_label","pre_or_post","tremor_label"]
+    label_column = "free_living_label"
 
     data = drop_gyroscope(data, to_drop)
-    data = downsample(data)
+    data = downsample(data,label_column)
     data = walking_to_binary(data)
     return data
 
@@ -161,46 +155,43 @@ def process_model2(data: pd.DataFrame) -> pd.DataFrame:
     Returns:
         df: processed data
     """
-    print(data.head(),"hereeee")
-    to_drop = ["gyroscope_x","gyroscope_y","gyroscope_z","pre_or_post","tremor_label"]
 
+    to_drop = ["gyroscope_x","gyroscope_y","gyroscope_z","free_living_label","pre_or_post","tremor_label"]
+    label_column = "arm_label"
     data = drop_gyroscope(data, to_drop)
-    data = downsample(data)
-    data = arm_activities_onehot(data)
-
+    data = downsample(data,label_column)
+    data = arm_activities_labeling(data)
     return data
 
 
 
 directory_origin = "data_parkinson_home/baseline_data"
+
 directory_processed_controls_model1 = "data_parkinson_home/processed_data_model1/control"
 directory_processed_pd_model1 = "data_parkinson_home/processed_data_model1/pd"
 
+directory_processed_controls_model2 = "data_parkinson_home/processed_data_model2/control"
+directory_processed_pd_model2 = "data_parkinson_home/processed_data_model2/pd"
+
 # view example file
-# temp = pd.read_parquet(directory_origin  + "/" + "hbv024_MAS.parquet")
+# temp = pd.read_parquet(directory_origin  + "/" + "hbv002_LAS.parquet")
 # print(temp.head())
 
 
-#loading and processing data
+
+# loading and processing data
 if __name__ == "__main__":
 
-    # for f in os.listdir(directory_origin):
+    for f in os.listdir(directory_origin):
 
-    #     file = pd.read_parquet(directory_origin + "/" + f)
+        file = pd.read_parquet(directory_origin + "/" + f)
 
-    #     if pd_recognition(file):
-    #         directory = directory_processed_pd_model1
-    #     else: 
-    #         directory = directory_processed_controls_model1
+        if pd_recognition(file):
+            directory = directory_processed_pd_model2
+        else: 
+            directory = directory_processed_controls_model2
+            #no controls for arm label detection
+            continue
 
-     
-
-    #     processed_model1 = process_model1(file)
-    #     processed_model1.to_parquet(directory + "/" + f)
-
-    temp = pd.read_parquet(directory_processed_pd_model1  + "/" + "hbv002_LAS.parquet")
-    print(temp)
-
-    temp = pd.read_parquet(directory_origin  + "/" + "hbv002_LAS.parquet")
-    print(temp)
-
+        processed_model2 = process_model2(file)
+        processed_model2.to_parquet(directory + "/" + f)
