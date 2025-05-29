@@ -8,8 +8,8 @@
 
 #Loading modules
 
-module load 2023
-module load Anaconda3/2023.07-2
-conda activate /projects/0/einf2658/users/mniechcial/envs/myenv
+module load 2022
+module load PyTorch/1.12.0-foss-2022a-CUDA-11.7.0
+
 
 python -u evaluations.py 

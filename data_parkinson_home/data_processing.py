@@ -126,6 +126,46 @@ def make_windows(data: pd.DataFrame) -> pd.DataFrame:
 
     return windows,labels
 
+
+def make_windows_arm_labels(data: pd.DataFrame) -> pd.DataFrame:
+    """The function splits accelometer data into 300 samples (10s) windows and normalising data
+    Each window is labeled 1 if threshold for gait is passed (acceptance_parameter) and 0 otherwise. 
+    
+
+    Args:
+        data (): _description_
+
+    Returns:
+        windows: array of size (number_of_windows, 3, 300) 
+        labels: array of size (number_of_windows) . It includes labels indicating gait for each window (1 or 0)
+    """
+    windows = []
+    labels = []
+    acceptance_parameter = 0.5
+    accelerometer = ["accelerometer_x", "accelerometer_y", "accelerometer_z"]
+    data[accelerometer] = (data[accelerometer]-data[accelerometer].mean())/data[accelerometer].std()
+    input = data[accelerometer].values
+    output = data["gait_arms_activities"].values
+
+    for i in range(0,data.shape[0]-300,300):
+
+        if np.count_nonzero(output[i:i+300] == 2)>=300*acceptance_parameter:
+            labels.append(2)
+        elif np.count_nonzero(output[i:i+300] == 1)>=300*acceptance_parameter:
+            labels.append(1)
+        else:
+            labels.append(0)
+
+        window = input[i:i+300,:].T 
+        windows.append(window)
+            
+    windows = np.array(windows)
+    labels = np.array(labels)
+
+
+    return windows,labels
+
+
 def process_model1(data: pd.DataFrame) -> pd.DataFrame:
     """This funtion takes raw data and returns processed data. 
     Processing includes dropping uneccessery features, downsampling and one-hot encoding and normalisation 
@@ -170,28 +210,27 @@ directory_origin = "data_parkinson_home/baseline_data"
 directory_processed_controls_model1 = "data_parkinson_home/processed_data_model1/control"
 directory_processed_pd_model1 = "data_parkinson_home/processed_data_model1/pd"
 
-directory_processed_controls_model2 = "data_parkinson_home/processed_data_model2/control"
 directory_processed_pd_model2 = "data_parkinson_home/processed_data_model2/pd"
 
 # view example file
-# temp = pd.read_parquet(directory_origin  + "/" + "hbv002_LAS.parquet")
+
+# temp = pd.read_parquet(directory_processed_pd_model2 + "/" + "hbv002_LAS.parquet")
 # print(temp.head())
 
 
 
 # loading and processing data
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    for f in os.listdir(directory_origin):
+#     for f in os.listdir(directory_origin):
 
-        file = pd.read_parquet(directory_origin + "/" + f)
+#         file = pd.read_parquet(directory_origin + "/" + f)
 
-        if pd_recognition(file):
-            directory = directory_processed_pd_model2
-        else: 
-            directory = directory_processed_controls_model2
-            #no controls for arm label detection
-            continue
+#         if pd_recognition(file):
+#             directory = directory_processed_pd_model2
+#         else: 
+#             #no controls for arm label detection
+#             continue
 
-        processed_model2 = process_model2(file)
-        processed_model2.to_parquet(directory + "/" + f)
+#         processed_model2 = process_model2(file)
+#         processed_model2.to_parquet(directory + "/" + f)
