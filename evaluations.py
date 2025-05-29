@@ -135,7 +135,7 @@ def run_evaluations():
     with open(path_splits, "r") as f:
         data = json.load(f)
     
-    with open("tresholds.json", "r") as f:
+    with open("tresholds_f1.json", "r") as f:
         tresholds = json.load(f)
 
     k = data["folds"] 
@@ -169,7 +169,7 @@ def run_evaluations():
     precision_recall(all_probabilities,all_labels,True)
 
 
-def set_treshold():
+def set_treshold_spe():
 
     path_splits = os.path.join(os.path.dirname(__file__),"splits.json")
 
@@ -210,6 +210,43 @@ def set_treshold():
     with open(path_splits, "w") as file:
         json.dump(all_tresholds, file)
 
+def set_treshold_f1():
+    path_splits = os.path.join(os.path.dirname(__file__),"splits.json")
+
+    with open(path_splits, "r") as f:
+        data = json.load(f)
+
+    k = data["folds"] 
+
+    all_tresholds = {}
+
+    for fold in range(k):
+        test_idx = data[str(fold)]
+        train_idx = [i for i in range(len(dataset)) if i not in test_idx]
+
+        probabilities, labels = get_probabilities(dataset, fold, train_idx)
+        probabilities = np.concatenate(probabilities).astype(float)
+        labels = np.concatenate(labels).astype(float)
+        
+        # maximising f1
+        best = 0.5
+        for threshold in np.linspace(0,1,100):
+            predictions = (probabilities[:,1]>threshold).astype(int)
+            current_score = f1_score(labels,predictions)
+            if current_score>best:
+                best = current_score
+                best_thr = threshold
+        print("fold:",best_thr)
+        all_tresholds[int(fold)] = float(best_thr)
+    
+    print("threshold sucessfully saved")
+
+    path_splits = os.path.join(os.path.dirname(__file__),"tresholds_f1.json")
+
+
+    with open(path_splits, "w") as file:
+        json.dump(all_tresholds, file)
+
 
 if __name__ == "__main__":
     np.random.seed(42)
@@ -219,7 +256,8 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = DatasetWalking()
 
-    set_treshold()
+    # set_treshold_spe()
+    set_treshold_f1()  
     run_evaluations()
 
 
