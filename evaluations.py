@@ -135,7 +135,7 @@ def run_evaluations():
     with open(path_splits, "r") as f:
         data = json.load(f)
     
-    with open("tresholds_f1.json", "r") as f:
+    with open("tresholds.json", "r") as f:
         tresholds = json.load(f)
 
     k = data["folds"] 
@@ -256,8 +256,8 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = DatasetWalking()
 
-    # set_treshold_spe()
-    set_treshold_f1()  
+    set_treshold_spe()
+    # set_treshold_f1()  
     run_evaluations()
 
 

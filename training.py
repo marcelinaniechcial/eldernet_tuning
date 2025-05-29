@@ -128,6 +128,6 @@ if __name__=="__main__":
     print("GPU",torch.cuda.is_available())
     dataset = DatasetWalking()
     batch_size = 32
-    epochs = 20
+    epochs = 15
     lr = 0.0001
     run_cross_validation(dataset, len(dataset), epochs, batch_size, lr, device)
