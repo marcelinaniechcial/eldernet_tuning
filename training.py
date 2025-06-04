@@ -1,6 +1,7 @@
 from sklearn.utils.class_weight import compute_class_weight
 import torch.optim.lr_scheduler as lr_scheduler
 from dataloader import DatasetWalking
+from dataloader import DatasetArmActivities
 from sklearn.utils import shuffle
 from sklearn.model_selection import KFold
 import json
@@ -8,6 +9,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import pandas as pd
 import numpy as np
+from torch import nn
 import torch
 import os
 
@@ -24,12 +26,25 @@ class Windows(Dataset):
         label = torch.tensor(self.labels[index], dtype=torch.long).to(device)
         return window,label
 
-    
 
-def load_model_training(device):
+class Classifier(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(Classifier, self).__init__()
+        self.linear1 = torch.nn.Linear(input_size, output_size)
+
+    def forward(self, x):
+        y_pred = self.linear1(x)
+        return y_pred
+
+
+def load_model_training(device, arm_activities_detection):
     model_name = "eldernet_ft"
     repo_name = 'yonbrand/ElderNet'
     model = torch.hub.load(repo_name, model_name)
+
+    if arm_activities_detection:
+        model.classifier = Classifier(50,3)
+
     model.train()
 
     return model.to(device)
@@ -45,7 +60,7 @@ def train(epochs, lr, dataset, train_idx, batch_size, device) -> dict:
     """
     np.random.seed(42)
     torch.manual_seed(42)
-    model = load_model_training(device)
+    model = load_model_training(device, True)
     optimizer = torch.optim.Adam(model.parameters(), lr = lr, weight_decay=5e-5)
 
     all_train_labels = []
@@ -72,6 +87,7 @@ def train(epochs, lr, dataset, train_idx, batch_size, device) -> dict:
 
     for i in range(epochs):
         print(f"Epoch {i}")
+        loss_avg = []
 
         for windows,labels in windows_loader:
             
@@ -80,10 +96,12 @@ def train(epochs, lr, dataset, train_idx, batch_size, device) -> dict:
             loss = criterion(output, labels)
             loss.backward()
             optimizer.step()
+            loss_avg.append(float(loss))
+            print(f"loss not avg {loss}")
             
         scheduler.step()
 
-        print(f"Loss:{loss}")
+        print(f"Loss:{sum(loss_avg)/len(loss_avg)}")
 
     
     return model.state_dict()
@@ -126,7 +144,8 @@ def run_cross_validation(dataset, n, epochs, batch_size, lr, device) -> tuple:
 if __name__=="__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("GPU",torch.cuda.is_available())
-    dataset = DatasetWalking()
+    # dataset = DatasetWalking()
+    dataset = DatasetArmActivities()
     batch_size = 32
     epochs = 15
     lr = 0.0001
