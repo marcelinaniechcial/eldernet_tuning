@@ -49,7 +49,7 @@ def load_model_training(device, arm_activities_detection):
 
     return model.to(device)
 
-def train(epochs, lr, dataset, train_idx, batch_size, device) -> dict:
+def train(fold, epochs, lr, dataset, train_idx, batch_size, device) -> dict:
     """Main training loop
 
     Args:
@@ -74,13 +74,12 @@ def train(epochs, lr, dataset, train_idx, batch_size, device) -> dict:
         all_train_labels.extend(dataset[i][1]["labels"].flatten().tolist())
 
     all_train_windows = np.concatenate(all_train_windows,axis=0)
-
     all_train_windows, all_train_labels = shuffle(all_train_windows,all_train_labels, random_state=42)
 
     weights = compute_class_weight(class_weight="balanced", classes=np.unique(all_train_labels), y = all_train_labels)
     weights = torch.tensor(weights,dtype=torch.float).to(device)
     criterion = torch.nn.CrossEntropyLoss(weight=weights)
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.7)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.85)
 
     windows_dataset = Windows(all_train_windows,all_train_labels)
     windows_loader = DataLoader(windows_dataset, batch_size=batch_size, shuffle=True)
@@ -97,14 +96,18 @@ def train(epochs, lr, dataset, train_idx, batch_size, device) -> dict:
             loss.backward()
             optimizer.step()
             loss_avg.append(float(loss))
-            print(f"loss not avg {loss}")
             
         scheduler.step()
 
         print(f"Loss:{sum(loss_avg)/len(loss_avg)}")
 
-    
-    return model.state_dict()
+        #saving after 15 epochs
+        if i==14 or i==19 or i==24 or i == 29 or i==32 or i==34:
+            path_models = os.path.join(os.path.dirname(__file__),"cross_validation_models_"+str(i+1)+"_e")
+            os.makedirs(path_models,exist_ok=True)
+            torch.save(model.state_dict(), f"{path_models}/{fold}.pt")
+
+    return None
     
 
 def run_cross_validation(dataset, n, epochs, batch_size, lr, device) -> tuple:
@@ -116,29 +119,30 @@ def run_cross_validation(dataset, n, epochs, batch_size, lr, device) -> tuple:
 
     """
 
-    kf = KFold(n_splits=n,shuffle=True)
+    kf = KFold(n_splits=n,shuffle=True, random_state=42)
     #saves indicies of test data and number of folds
     splits = {}
     splits["folds"] = n
 
-    path_models = os.path.join(os.path.dirname(__file__),"cross_validation_models")
-    os.makedirs(path_models,exist_ok=True)
-
-    for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
-
-        print(f"fold: {fold}, Training: {train_idx}, Testing: {test_idx}")
-
-        splits[fold] = test_idx.tolist()
-
-        parameters = train(epochs, lr, dataset, train_idx, batch_size, device)
-        
-        torch.save(parameters, f"{path_models}/{fold}.pt")
-
     path_splits = os.path.join(os.path.dirname(__file__),"splits.json")
 
-    with open(path_splits, "w") as f:
-            json.dump(splits, f) 
+    for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
+        splits[fold] = test_idx.tolist()
 
+    with open(path_splits, "w") as f:
+        json.dump(splits, f)
+
+
+
+    for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
+ 
+        print(f"fold: {fold}, Training: {train_idx}, Testing: {test_idx}")
+
+        train(fold, epochs, lr, dataset, train_idx, batch_size, device)
+
+
+  
+        
     print("Models sucessfully saved")
 
 if __name__=="__main__":
@@ -147,6 +151,6 @@ if __name__=="__main__":
     # dataset = DatasetWalking()
     dataset = DatasetArmActivities()
     batch_size = 32
-    epochs = 15
+    epochs = 35
     lr = 0.0001
     run_cross_validation(dataset, len(dataset), epochs, batch_size, lr, device)

@@ -4,22 +4,37 @@ import os, sys
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn import metrics
-from dataloader import DatasetWalking
+from dataloader import DatasetWalking, DatasetArmActivities
 from torch.utils.data import DataLoader
 from training import train
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, precision_recall_curve
 import numpy as np
+from torch import nn
 import torch
 import json
 
-def load_trained_model( parameters):
 
+class Classifier(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(Classifier, self).__init__()
+        self.linear1 = torch.nn.Linear(input_size, output_size)
+
+    def forward(self, x):
+        y_pred = self.linear1(x)
+        return y_pred
+    
+
+def load_trained_model(parameters, arm_activities_detection):
     model_name = "eldernet_ft"
     repo_name = 'yonbrand/ElderNet'
     model = torch.hub.load(repo_name, model_name)
-    model.load_state_dict(torch.load(parameters, weights_only=True,map_location=device))
+
+    if arm_activities_detection:
+        model.classifier = Classifier(50,3)
+
     model.eval()
-    return model.to(device)
+    return model
+
 
 def run_model(input, model) -> torch.tensor:
     """The function uses loaded model to clasify occurance of gait
@@ -79,11 +94,11 @@ def precision_recall(probabilities, labels, plot):
 
     return None
 
-def get_probabilities(dataset, fold, idx):
+def get_probabilities(dataset, fold, idx, arm_activities):
 
     path_model = os.path.join(os.path.dirname(__file__),"cross_validation_models")
 
-    model = load_trained_model(f"{path_model}/{fold}.pt") 
+    model = load_trained_model(f"{path_model}/{fold}.pt",arm_activities) 
 
     test_sampler = torch.utils.data.SubsetRandomSampler(idx)
     dataloader = DataLoader(dataset, batch_size=1, sampler=test_sampler)
@@ -106,37 +121,47 @@ def get_probabilities(dataset, fold, idx):
             #model output to binary classification
 
             y_pred = (torch.nn.functional.softmax(output, dim=1).to(device)).cpu().numpy().squeeze()
-
+    
             all_probs.append(y_pred)
             all_labels.append(y_true)
         
     return all_probs, all_labels
 
-def get_metrics(treshold, probabilities, labels):
+def get_metrics(treshold, probabilities, labels, multiclass):
 
     results = {}
-    predictions = np.where(probabilities[:,1]>treshold,1,0)
-
-    results["accuracy"] =  accuracy_score(labels, predictions)
-    results["recall"] = recall_score(labels,predictions)
-    results["specificity"] = recall_score(labels, predictions, pos_label=0)
-    results["confusion__matrix"] =  confusion_matrix(labels, predictions).tolist()
-    results["f1"] = f1_score(labels,predictions)
-    results["auc"] = auc(probabilities,labels, False)
-    
+    if multiclass:
+        predictions = np.argmax(probabilities,axis=1)
+        print(list(predictions).count(0),list(predictions).count(1),list(predictions).count(2))
+        print(list(labels).count(0),list(labels).count(1),list(labels).count(2))
+        results["accuracy"] =  accuracy_score(labels, predictions)
+        results["recall"] = recall_score(labels,predictions, average="macro")
+        # results["specificity"] = recall_score(labels, predictions, pos_label=0)
+        # results["confusion__matrix"] =  confusion_matrix(labels, predictions).tolist()
+        results["f1"] = f1_score(labels,predictions, average="macro")
+        # results["auc"] = auc(probabilities,labels, False)
+    if not multiclass:
+        predictions = np.where(probabilities[:,1]>treshold,1,0)
+        results["accuracy"] =  accuracy_score(labels, predictions)
+        results["recall"] = recall_score(labels,predictions)
+        results["specificity"] = recall_score(labels, predictions, pos_label=0)
+        results["confusion__matrix"] =  confusion_matrix(labels, predictions).tolist()
+        results["f1"] = f1_score(labels,predictions)
+        results["auc"] = auc(probabilities,labels, False)
+        
     return results
 
 
-
-def run_evaluations():
+def run_evaluations(multiclass):
 
     path_splits = os.path.join(os.path.dirname(__file__),"splits.json")
 
     with open(path_splits, "r") as f:
         data = json.load(f)
     
-    with open("tresholds.json", "r") as f:
-        tresholds = json.load(f)
+    if not multiclass:
+        with open("tresholds_f1.json", "r") as f:
+            tresholds = json.load(f)
 
     k = data["folds"] 
 
@@ -147,16 +172,28 @@ def run_evaluations():
     for fold in range(k):
         test_idx = data[str(fold)] 
         for index in  test_idx:
-            # print("fold",fold,",Indexes to test ",test_idx,"Current",index)
-            treshold = tresholds[str(fold)]
-            probabilities, labels = get_probabilities(dataset, fold, [index])
-            results1 = get_metrics(treshold, probabilities[0], labels[0])
-            results1["id"] = dataset.data[index][0]["file"]
+            
+            probabilities, labels = get_probabilities(dataset, fold, [index], multiclass)
+            
+            if multiclass:
+                results1 = get_metrics(None, probabilities[0], labels[0], True)
+                results1["id"] = dataset.data[index][0]["file"]
 
-            results2 = get_metrics(treshold, probabilities[1], labels[1])
-            results2["id"] = dataset.data[index][1]["file"]
+                results2 = get_metrics(None, probabilities[1], labels[1], True)
+                results2["id"] = dataset.data[index][1]["file"]
 
-            results[fold] = [results1,results2]
+                results[fold] = [results1,results2]
+
+            if not multiclass:
+                treshold = tresholds[str(fold)]
+                
+                results1 = get_metrics(treshold, probabilities[0], labels[0])
+                results1["id"] = dataset.data[index][0]["file"]
+
+                results2 = get_metrics(treshold, probabilities[1], labels[1])
+                results2["id"] = dataset.data[index][1]["file"]
+
+                results[fold] = [results1,results2]
 
             #flattening 
             all_probabilities.extend(np.concatenate(probabilities).tolist())
@@ -164,12 +201,12 @@ def run_evaluations():
 
     with open("results.json", "w") as file:
         json.dump(results, file)
+    if not multiclass:
+        auc(all_probabilities,all_labels,True)
+        precision_recall(all_probabilities,all_labels,True)
 
-    auc(all_probabilities,all_labels,True)
-    precision_recall(all_probabilities,all_labels,True)
 
-
-def set_treshold_spe():
+def set_treshold_spe(arm_activities):
 
     path_splits = os.path.join(os.path.dirname(__file__),"splits.json")
 
@@ -184,7 +221,7 @@ def set_treshold_spe():
         test_idx = data[str(fold)]
         train_idx = [i for i in range(len(dataset)) if i not in test_idx]
 
-        probabilities, labels = get_probabilities(dataset, fold, train_idx)
+        probabilities, labels = get_probabilities(dataset, fold, train_idx, arm_activities)
 
 
         probabilities = np.concatenate(probabilities).tolist()
@@ -210,7 +247,7 @@ def set_treshold_spe():
     with open(path_splits, "w") as file:
         json.dump(all_tresholds, file)
 
-def set_treshold_f1():
+def set_treshold_f1(arm_activities):
     path_splits = os.path.join(os.path.dirname(__file__),"splits.json")
 
     with open(path_splits, "r") as f:
@@ -224,7 +261,7 @@ def set_treshold_f1():
         test_idx = data[str(fold)]
         train_idx = [i for i in range(len(dataset)) if i not in test_idx]
 
-        probabilities, labels = get_probabilities(dataset, fold, train_idx)
+        probabilities, labels = get_probabilities(dataset, fold, train_idx, arm_activities)
         probabilities = np.concatenate(probabilities).astype(float)
         labels = np.concatenate(labels).astype(float)
         
@@ -254,10 +291,16 @@ if __name__ == "__main__":
 
     #test model 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = DatasetWalking()
 
-    set_treshold_spe()
-    # set_treshold_f1()  
-    run_evaluations()
+    model = "model2"
+
+    if model == "model1":
+        dataset = DatasetWalking()
+        set_treshold_spe()
+        set_treshold_f1()  
+        run_evaluations(False)
+    elif model == "model2":
+        dataset = DatasetArmActivities() 
+        run_evaluations(True)
 
 
