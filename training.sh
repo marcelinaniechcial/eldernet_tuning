@@ -9,8 +9,8 @@
 
 #Loading modules
 
-module purge
-module load 2022
+module load 2023
+module load Anaconda3/2023.07-2
 module load PyTorch/1.12.0-foss-2022a-CUDA-11.7.0
 
 
