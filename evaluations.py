@@ -9,31 +9,23 @@ from torch.utils.data import DataLoader
 from training import train
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, precision_recall_curve
 import numpy as np
-from torch import nn
+from classifier import Classifier
 import torch
 import json
 
-
-class Classifier(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(Classifier, self).__init__()
-        self.linear1 = torch.nn.Linear(input_size, output_size)
-
-    def forward(self, x):
-        y_pred = self.linear1(x)
-        return y_pred
-    
 
 def load_trained_model(parameters, arm_activities_detection):
     model_name = "eldernet_ft"
     repo_name = 'yonbrand/ElderNet'
     model = torch.hub.load(repo_name, model_name)
-
+    
     if arm_activities_detection:
         model.classifier = Classifier(50,3)
 
+    model.load_state_dict(torch.load(parameters, weights_only=True,map_location=device))
+
     model.eval()
-    return model
+    return model.to(device)
 
 
 def run_model(input, model) -> torch.tensor:
@@ -131,15 +123,28 @@ def get_metrics(treshold, probabilities, labels, multiclass):
 
     results = {}
     if multiclass:
+
         predictions = np.argmax(probabilities,axis=1)
-        print(list(predictions).count(0),list(predictions).count(1),list(predictions).count(2))
-        print(list(labels).count(0),list(labels).count(1),list(labels).count(2))
+        # print(list(predictions).count(0),list(predictions).count(1),list(predictions).count(2))
+        # print(list(labels).count(0),list(labels).count(1),list(labels).count(2))
+
         results["accuracy"] =  accuracy_score(labels, predictions)
         results["recall"] = recall_score(labels,predictions, average="macro")
-        # results["specificity"] = recall_score(labels, predictions, pos_label=0)
-        # results["confusion__matrix"] =  confusion_matrix(labels, predictions).tolist()
         results["f1"] = f1_score(labels,predictions, average="macro")
-        # results["auc"] = auc(probabilities,labels, False)
+
+        # checking scores of gait without other arm activities
+        pred_temp = np.where(predictions==2,1,0)
+        labels_temp = np.where(labels==2,1,0)
+
+        results["accuracy_without"] =  accuracy_score(labels_temp, pred_temp)
+        results["recall_without"] = recall_score(labels_temp, pred_temp)
+        results["f1_without"] = f1_score(labels_temp, pred_temp)
+        print(probabilities[:,2].shape)
+        results["auc_without"] = metrics.roc_auc_score(labels_temp, probabilities[:,2])
+        results["specificity_without"] = recall_score(labels_temp, pred_temp, pos_label=0)
+
+
+
     if not multiclass:
         predictions = np.where(probabilities[:,1]>treshold,1,0)
         results["accuracy"] =  accuracy_score(labels, predictions)
@@ -187,10 +192,10 @@ def run_evaluations(multiclass):
             if not multiclass:
                 treshold = tresholds[str(fold)]
                 
-                results1 = get_metrics(treshold, probabilities[0], labels[0])
+                results1 = get_metrics(treshold, probabilities[0], labels[0], False)
                 results1["id"] = dataset.data[index][0]["file"]
 
-                results2 = get_metrics(treshold, probabilities[1], labels[1])
+                results2 = get_metrics(treshold, probabilities[1], labels[1], False)
                 results2["id"] = dataset.data[index][1]["file"]
 
                 results[fold] = [results1,results2]
@@ -296,9 +301,10 @@ if __name__ == "__main__":
 
     if model == "model1":
         dataset = DatasetWalking()
-        set_treshold_spe()
-        set_treshold_f1()  
+        # set_treshold_spe()
+        # set_treshold_f1(False)  
         run_evaluations(False)
+
     elif model == "model2":
         dataset = DatasetArmActivities() 
         run_evaluations(True)

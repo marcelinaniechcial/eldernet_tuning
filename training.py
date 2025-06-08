@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 import pandas as pd
 import numpy as np
 from torch import nn
+from classifier import Classifier
 import torch
 import os
 
@@ -26,17 +27,6 @@ class Windows(Dataset):
         label = torch.tensor(self.labels[index], dtype=torch.long).to(device)
         return window,label
 
-
-class Classifier(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(Classifier, self).__init__()
-        self.linear1 = torch.nn.Linear(input_size, output_size)
-
-    def forward(self, x):
-        y_pred = self.linear1(x)
-        return y_pred
-
-
 def load_model_training(device, arm_activities_detection):
     model_name = "eldernet_ft"
     repo_name = 'yonbrand/ElderNet'
@@ -49,7 +39,7 @@ def load_model_training(device, arm_activities_detection):
 
     return model.to(device)
 
-def train(fold, epochs, lr, dataset, train_idx, batch_size, device) -> dict:
+def train(fold, epochs, lr, dataset, train_idx, batch_size, device, arm_activities) -> dict:
     """Main training loop
 
     Args:
@@ -60,8 +50,8 @@ def train(fold, epochs, lr, dataset, train_idx, batch_size, device) -> dict:
     """
     np.random.seed(42)
     torch.manual_seed(42)
-    model = load_model_training(device, True)
-    optimizer = torch.optim.Adam(model.parameters(), lr = lr, weight_decay=5e-5)
+    model = load_model_training(device, arm_activities)
+    optimizer = torch.optim.Adam(model.parameters(), lr = lr, weight_decay=1e-4)
 
     all_train_labels = []
     all_train_windows = []
@@ -79,7 +69,7 @@ def train(fold, epochs, lr, dataset, train_idx, batch_size, device) -> dict:
     weights = compute_class_weight(class_weight="balanced", classes=np.unique(all_train_labels), y = all_train_labels)
     weights = torch.tensor(weights,dtype=torch.float).to(device)
     criterion = torch.nn.CrossEntropyLoss(weight=weights)
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.85)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
 
     windows_dataset = Windows(all_train_windows,all_train_labels)
     windows_loader = DataLoader(windows_dataset, batch_size=batch_size, shuffle=True)
@@ -101,8 +91,7 @@ def train(fold, epochs, lr, dataset, train_idx, batch_size, device) -> dict:
 
         print(f"Loss:{sum(loss_avg)/len(loss_avg)}")
 
-        #saving after 15 epochs
-        if i==14 or i==19 or i==24 or i == 29 or i==32 or i==34:
+        if i==14 or i==17 or i==19 or i==24 or i==29:
             path_models = os.path.join(os.path.dirname(__file__),"cross_validation_models_"+str(i+1)+"_e")
             os.makedirs(path_models,exist_ok=True)
             torch.save(model.state_dict(), f"{path_models}/{fold}.pt")
@@ -110,7 +99,7 @@ def train(fold, epochs, lr, dataset, train_idx, batch_size, device) -> dict:
     return None
     
 
-def run_cross_validation(dataset, n, epochs, batch_size, lr, device) -> tuple:
+def run_cross_validation(dataset, n, epochs, batch_size, lr, device, arm_activities) -> tuple:
     """This function is used for n-fold cross validation
 
     Args:
@@ -138,7 +127,7 @@ def run_cross_validation(dataset, n, epochs, batch_size, lr, device) -> tuple:
  
         print(f"fold: {fold}, Training: {train_idx}, Testing: {test_idx}")
 
-        train(fold, epochs, lr, dataset, train_idx, batch_size, device)
+        train(fold, epochs, lr, dataset, train_idx, batch_size, device, arm_activities)
 
 
   
@@ -149,8 +138,9 @@ if __name__=="__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("GPU",torch.cuda.is_available())
     # dataset = DatasetWalking()
+    arm_activities = True
     dataset = DatasetArmActivities()
     batch_size = 32
-    epochs = 35
-    lr = 0.0001
-    run_cross_validation(dataset, len(dataset), epochs, batch_size, lr, device)
+    epochs = 30
+    lr = 0.00025
+    run_cross_validation(dataset, len(dataset), epochs, batch_size, lr, device, arm_activities)
