@@ -3,14 +3,19 @@ import pandas as pd
 from torch.utils.data import Dataset
 from data_processing.data_processing import make_windows, make_windows_arm_labels
 
-######################################################################################################
+########################################################################################################
 # Details about data can be found here: https://data.ru.nl/collections/di/dcmn/DSC_pdhasq_t0000123a_971
-######################################################################################################
+########################################################################################################
 
 
 class DatasetWalking(Dataset):
     """
-    Custom torch dataset with labaled gait segments. 
+    Torch dataset with labeled arm activities. 
+
+        Where:
+        0 - no gait
+        1 - gait 
+
     """
 
     def __init__(self):
@@ -32,12 +37,6 @@ class DatasetWalking(Dataset):
             sorted_filenames = sorted(os.listdir(file_path))
 
             for f in sorted_filenames:
-                # subset of database for testing
-                # files1 = [ "hbv058_LAS.parquet","hbv002_LAS.parquet","hbv058_MAS.parquet","hbv002_MAS.parquet", "hbv022_LAS.parquet", "hbv022_MAS.parquet"]
-                # if str(f) in files1:
-                #     pass
-                # else:
-                #     continue
                 study_id = f[:6]
                 if positions.get(study_id, -1) == -1:
                     positions[study_id] = counter
@@ -66,6 +65,15 @@ class DatasetWalking(Dataset):
 
 
 class DatasetArmActivities(Dataset):
+    """Torch dataset with labeled arm activities. 
+
+        Where:
+        0 - no gait
+        1 - gait with other arm acitivites (e.g: holding objects)
+        2 - gait without other arm activities (i.e pure gait segments)
+
+    """
+
     def __init__(self):
         self.data = []
 

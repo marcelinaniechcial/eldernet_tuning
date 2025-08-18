@@ -45,8 +45,6 @@ def run_model(input, model) -> torch.tensor:
         1-D tensor : prediction of gait for each window 
     """
 
-    repo_name = 'yonbrand/ElderNet'
-
     x = torch.FloatTensor(input).to(device)
 
     with torch.no_grad():
@@ -56,21 +54,22 @@ def run_model(input, model) -> torch.tensor:
 
 
 def auc(probabilities, labels, plot):
-    """_summary_
+    """Given models outputs, the function computes 
+    Area Under the Curve (AUC) with optional plot
 
     Args:
-        probabilities (_type_): _description_
-        labels (_type_): _description_
-        plot (_type_): _description_
+        probabilities (np.array): _description_
+        labels (np.array): _description_
+        plot (bool): _description_
 
     Returns:
-        _type_: _description_
+        float: area under the curve
     """
 
     y_scores = np.array(probabilities)[:, 1].squeeze()
     y_true = np.array(labels)
 
-    fpr, tpr, thresholds = metrics.roc_curve(y_true, y_scores)
+    fpr, tpr, _ = metrics.roc_curve(y_true, y_scores)
     auc = metrics.roc_auc_score(y_true, y_scores)
     if plot:
         plt.figure()
@@ -85,13 +84,14 @@ def auc(probabilities, labels, plot):
     return auc
 
 
-def precision_recall(probabilities, labels, plot):
-    """_summary_
+def precision_recall(probabilities, labels, plot) -> None:
+    """Given models outputs, the function computes 
+    Precision-Recall Curve with optional plot
 
     Args:
-        probabilities (): 
-        labels (_type_): _description_
-        plot (_type_): _description_
+        probabilities (np.array): 
+        labels (np.array): _description_
+        plot (bool): _description_
 
     Returns:
         _type_: _description_
@@ -99,7 +99,7 @@ def precision_recall(probabilities, labels, plot):
     y_scores = np.array(probabilities)[:, 1].squeeze()
     y_true = np.array(labels)
 
-    precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
+    precision, recall, _ = precision_recall_curve(y_true, y_scores)
 
     if plot:
         plt.figure()
@@ -144,16 +144,19 @@ def get_probabilities(dataset, fold, idx, file_name, arm_activities):
             batch = subject[i]
 
             windows = (batch["windows"].squeeze(0)).float()
-            y_true = (batch["labels"].squeeze(0)).numpy()
+            y_true = (batch["labels"].squeeze(0))
 
             output = run_model(windows, model)
 
             # binary classification
-            y_pred = (torch.nn.functional.softmax(
-                output, dim=1).to(device)).cpu().numpy().squeeze()
+            y_pred = torch.softmax(output, dim=1)
+
             if arm_activities:
-                y_pred = y_pred[:, 2]
+                y_pred = y_pred[:, 2].detach().cpu().numpy()
                 y_true = np.where(y_true == 2, 1, 0)
+            else:
+                y_pred = y_pred.detach().cpu().numpy()
+                y_true = y_true.detach().cpu().numpy()
 
             all_probs.append(y_pred)
             all_labels.append(y_true)
@@ -161,11 +164,11 @@ def get_probabilities(dataset, fold, idx, file_name, arm_activities):
     return all_probs, all_labels
 
 
-def get_metrics(treshold, probabilities, labels, multiclass):
+def get_metrics(treshold: float, probabilities: np.array, labels: np.array, multiclass: bool) -> dict:
     """_summary_
 
     Args:
-        treshold (): _description_
+        treshold (float): The threshold for gait gait classification
         probabilities (np.array): probabilities of each class (n,m) where m={2,3} depending on configs 
         labels (np.array): labeles for each window (n,)
         multiclass (boolean): detecting gait (true) or detecting gait without arm activites (false)
@@ -175,7 +178,6 @@ def get_metrics(treshold, probabilities, labels, multiclass):
     """
 
     results = {}
-    print("here", probabilities.shape, labels.shape)
 
     if multiclass:
         predictions = np.where(probabilities > treshold, 1, 0)
@@ -203,12 +205,12 @@ def get_metrics(treshold, probabilities, labels, multiclass):
     return results
 
 
-def run_evaluations(file_name, multiclass):
+def run_evaluations(file_name: str, multiclass: bool):
     """_summary_
 
     Args:
-        file_name (_type_): _description_
-        multiclass (_type_): _description_
+        file_name (str): model weights file name
+        multiclass (bool): detecting gait (true) or detecting gait without arm activites (false)
     """
 
     path_splits = os.path.join(os.path.dirname(__file__), "splits.json")
@@ -255,7 +257,7 @@ def run_evaluations(file_name, multiclass):
         precision_recall(all_probabilities, all_labels, True)
 
 
-def set_treshold_spe(file_name, arm_activities):
+def set_specificity_thresholds(file_name: str, arm_activities: bool) -> None:
     """
 
     Args:
@@ -298,7 +300,7 @@ def set_treshold_spe(file_name, arm_activities):
 
         all_tresholds[int(fold)] = float(threshold)
 
-    print("threshold sucessfully saved")
+    print("Threshold sucessfully saved")
 
     path_splits = os.path.join(os.path.dirname(__file__), "tresholds.json")
 
@@ -312,19 +314,20 @@ if __name__ == "__main__":
 
     # test model
     device = torch.device(
-        "mps" if torch.backends.mps.is_available() else "cpu")
-    print("GPU: ", torch.mps.is_available())
+        "cuda" if torch.backends.cuda.is_available() else
+        "mps" if torch.backends.mps.is_available()
+        else "cpu")
 
     # CONFIGS
     model = "model1"  # model1 - geit detection, model2 - gait without other arm activities
-    file_name = 'cross_validation_models'  # directory with models
+    file_name = 'cross_validation_models_3_e'  # directory with models
 
     if model == "model1":
         dataset = DatasetWalking()
-        set_treshold_spe(file_name, False)
+        set_specificity_thresholds(file_name, False)
         run_evaluations(file_name, False)
 
     elif model == "model2":
         dataset = DatasetArmActivities()
-        set_treshold_spe(file_name, True)
+        set_specificity_thresholds(file_name, True)
         run_evaluations(file_name, True)

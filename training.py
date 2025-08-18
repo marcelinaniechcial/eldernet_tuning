@@ -50,9 +50,11 @@ def load_model_training(device, arm_activities_detection, use_ssl):
         repo_name = 'yonbrand/ElderNet'
         model = torch.hub.load(repo_name, model_name)
     else:
+
         feature_extractor = Resnet(
-            is_eva=True, is_simclr=False, is_mtl=False, output_size=1024)
-        model = ElderNet(feature_extractor=feature_extractor,
+            is_eva=False, is_simclr=False, is_mtl=False)
+
+        model = ElderNet(feature_extractor=feature_extractor.feature_extractor,
                          is_eva=True, is_simclr=False, is_mtl=False, head='fc')
 
     if arm_activities_detection:
@@ -109,10 +111,12 @@ def train(fold, epochs, lr, dataset, train_idx, batch_size, device, arm_activiti
 
     # training loop
     for i in range(epochs):
+
         print(f"Epoch {i}")
         loss_avg = []
 
         for windows, labels in windows_loader:
+
             windows = windows.to(device)
             labels = labels.to(device)
             optimizer.zero_grad()
@@ -124,14 +128,12 @@ def train(fold, epochs, lr, dataset, train_idx, batch_size, device, arm_activiti
 
         scheduler.step()
 
-        print(f"Loss:{sum(loss_avg)/len(loss_avg)}")
+        print(f"Average loss:{sum(loss_avg)/len(loss_avg)}")
 
-        # saving models every 5 epochs
-        if i % 2 == 0:
-            path_models = os.path.join(os.path.dirname(
-                __file__), "cross_validation_models_"+str(i+1)+"_e")
-            os.makedirs(path_models, exist_ok=True)
-            torch.save(model.state_dict(), f"{path_models}/{fold}.pt")
+        path_models = os.path.join(os.path.dirname(
+            __file__), "cross_validation_models_"+str(i+1)+"_e")
+        os.makedirs(path_models, exist_ok=True)
+        torch.save(model.state_dict(), f"{path_models}/{fold}.pt")
 
     return None
 
@@ -151,25 +153,22 @@ def run_cross_validation(dataset, n, epochs, batch_size, lr, device, arm_activit
     """
 
     kf = KFold(n_splits=n, shuffle=True, random_state=42)
-    # saves indicies of test data and number of folds
     splits = {}
     splits["folds"] = n
 
     path_splits = os.path.join(os.path.dirname(__file__), "splits.json")
 
     for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
-        splits[fold] = test_idx.tolist()
 
-    with open(path_splits, "w") as f:
-        json.dump(splits, f)
-
-    for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
-
-        print(f"fold: {fold}, Training: {train_idx}, Testing: {test_idx}")
+        print(f"Fold: {fold}")
 
         train(fold, epochs, lr, dataset, train_idx, batch_size,
               device, arm_activities, use_ssl_model)
+        splits[fold] = test_idx.tolist()
 
+    # saves indicies of test data and number of folds
+    with open(path_splits, "w") as f:
+        json.dump(splits, f)
     print("Models sucessfully saved")
 
 
@@ -181,8 +180,8 @@ if __name__ == "__main__":
 
     model = "model1"  # model1 - geit detection, model2 - gait without other arm activities
     use_ssl_model = True
-    batch_size = 64
-    epochs = 3
+    batch_size = 32
+    epochs = 9
     lr = 0.0001
 
     if model == "model1":
