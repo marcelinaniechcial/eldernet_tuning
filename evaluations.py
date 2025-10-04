@@ -11,14 +11,14 @@ from classifier import Classifier
 
 
 def load_trained_model(parameters, arm_activities_detection):
-    """Loades torch model with choosen classifier in evaluation mode
+    """Loads torch model with chosen classifier
 
     Args:
-        parameters (str): saved weights of the model 
-        arm_activities_detection (boolean): detecting gait (true) or detecting gait without arm activites (false)
+        parameters (str): Saved weights of the model 
+        arm_activities_detection (boolean): If True, uses 3-class model, else, 2-classes
 
     Returns:
-        torch.nn.Module: loaded torch model set to train
+        torch.nn.Module: loaded torch model
     """
     model_name = "eldernet_ft"
     repo_name = 'yonbrand/ElderNet'
@@ -35,15 +35,15 @@ def load_trained_model(parameters, arm_activities_detection):
 
 
 def run_model(input, model) -> torch.tensor:
-    """The function uses loaded model to clasify occurance of gait
+    """Uses the loaded model to classify the occurrence of gait activity.
 
     Args:
-        input (np.array): accelometer data as 10s windows 
-        model : loaded model which should be used to make predictions
+        input (np.ndarray): Accelerometer data as 10-second windows.
+        model (torch.nn.Module): Pre-trained model
 
     Returns:
-        1-D tensor : prediction of gait for each window 
-    """
+        torch.Tensor: Model output for each window.
+"""
 
     x = torch.FloatTensor(input).to(device)
 
@@ -54,16 +54,15 @@ def run_model(input, model) -> torch.tensor:
 
 
 def auc(probabilities, labels, plot):
-    """Given models outputs, the function computes 
-    Area Under the Curve (AUC) with optional plot
+    """Computes AUC and gives optional plot.
 
     Args:
-        probabilities (np.array): _description_
-        labels (np.array): _description_
-        plot (bool): _description_
+        probabilities (np.array): Predicted probabilities for each class.
+        labels (np.array): Binary labels.
+        plot (bool): Whether to plot the ROC curve.
 
     Returns:
-        float: area under the curve
+        float: Computed AUC score.
     """
 
     y_scores = np.array(probabilities)[:, 1].squeeze()
@@ -89,12 +88,12 @@ def precision_recall(probabilities, labels, plot) -> None:
     Precision-Recall Curve with optional plot
 
     Args:
-        probabilities (np.array): 
-        labels (np.array): _description_
-        plot (bool): _description_
+        probabilities (np.array): Predicted probabilities for each class.
+        labels (np.array): Binary labels.
+        plot (bool): Whether to plot the Precision-Recall curve.
 
     Returns:
-        _type_: _description_
+        None
     """
     y_scores = np.array(probabilities)[:, 1].squeeze()
     y_true = np.array(labels)
@@ -115,17 +114,18 @@ def precision_recall(probabilities, labels, plot) -> None:
 
 
 def get_probabilities(dataset, fold, idx, file_name, arm_activities):
-    """_summary_
+    """Gets model predictions for each file
 
     Args:
-        dataset (_type_): _description_
-        fold (_type_): _description_
-        idx (_type_): _description_
-        arm_activities (_type_): _description_
+        dataset (torch.utils.data.Dataset): Dataset containing windowed input data and labels.
+        fold (str): Fold number used to select the model.
+        idx (list[int]): List of sample indices to evaluate.
+        file_name (str): File name for the model checkpoint. 
+        arm_activities (bool): If True, uses 3-class model, else, 2-classes.
 
     Returns:
-        _type_: _description_
-    """
+        tuple(list[np.ndarray],list[np.ndarray]): Model output probabilities 
+        and corresponding true labels."""
 
     path_model = os.path.join(os.path.dirname(__file__), file_name)
 
@@ -148,7 +148,6 @@ def get_probabilities(dataset, fold, idx, file_name, arm_activities):
 
             output = run_model(windows, model)
 
-            # binary classification
             y_pred = torch.softmax(output, dim=1)
 
             if arm_activities:
@@ -164,30 +163,30 @@ def get_probabilities(dataset, fold, idx, file_name, arm_activities):
     return all_probs, all_labels
 
 
-def get_metrics(treshold: float, probabilities: np.array, labels: np.array, multiclass: bool) -> dict:
-    """_summary_
+def get_metrics(threshold: float, probabilities: np.array, labels: np.array, multiclass: bool) -> dict:
+    """Calculates metrics for the model.
 
     Args:
-        treshold (float): The threshold for gait gait classification
-        probabilities (np.array): probabilities of each class (n,m) where m={2,3} depending on configs 
-        labels (np.array): labeles for each window (n,)
-        multiclass (boolean): detecting gait (true) or detecting gait without arm activites (false)
+        threshold (float): The threshold for gait gait classification.
+        probabilities (np.array): Probabilities of each class.
+        labels (np.array): Labels for each window. 
+        multiclass (bool): If True, uses 3-class model, else, 2-classes.
 
     Returns:
-        _type_: _description_
+        dict: Dictionary of metrics.
     """
 
     results = {}
 
     if multiclass:
-        predictions = np.where(probabilities > treshold, 1, 0)
+        predictions = np.where(probabilities > threshold, 1, 0)
     else:
-        predictions = np.where(probabilities[:, 1] > treshold, 1, 0)
+        predictions = np.where(probabilities[:, 1] > threshold, 1, 0)
 
     results["accuracy"] = accuracy_score(labels, predictions)
     results["recall"] = recall_score(labels, predictions)
     results["specificity"] = recall_score(labels, predictions, pos_label=0)
-    results["confusion__matrix"] = confusion_matrix(
+    results["confusion_matrix"] = confusion_matrix(
         labels, predictions).tolist()
     results["f1"] = f1_score(labels, predictions)
 
@@ -206,11 +205,12 @@ def get_metrics(treshold: float, probabilities: np.array, labels: np.array, mult
 
 
 def run_evaluations(file_name: str, multiclass: bool):
-    """_summary_
+    """ Runs cross-validation evaluations and saves results to JSON
 
     Args:
-        file_name (str): model weights file name
-        multiclass (bool): detecting gait (true) or detecting gait without arm activites (false)
+        file_name (str): Model weights file name.
+        multiclass (bool): If True, uses 3-class model, else, 2-classes.
+
     """
 
     path_splits = os.path.join(os.path.dirname(__file__), "splits.json")
@@ -219,8 +219,8 @@ def run_evaluations(file_name: str, multiclass: bool):
         data = json.load(f)
 
     # if not multiclass:
-    with open("tresholds.json", "r") as f:
-        tresholds = json.load(f)
+    with open("threshold.json", "r") as f:
+        threshold = json.load(f)
 
     k = data["folds"]
 
@@ -234,14 +234,14 @@ def run_evaluations(file_name: str, multiclass: bool):
 
             probabilities, labels = get_probabilities(
                 dataset, fold, [index], file_name, multiclass)
-            treshold = tresholds[str(fold)]
+            threshold = threshold[str(fold)]
 
             results1 = get_metrics(
-                treshold, probabilities[0], labels[0], multiclass)
+                threshold, probabilities[0], labels[0], multiclass)
             results1["id"] = dataset.data[index][0]["file"]
 
             results2 = get_metrics(
-                treshold, probabilities[1], labels[1], multiclass)
+                threshold, probabilities[1], labels[1], multiclass)
             results2["id"] = dataset.data[index][1]["file"]
 
             results[fold] = [results1, results2]
@@ -257,12 +257,11 @@ def run_evaluations(file_name: str, multiclass: bool):
         precision_recall(all_probabilities, all_labels, True)
 
 
-def set_specificity_thresholds(file_name: str, arm_activities: bool) -> None:
+def set_specificity_threshold(file_name: str, arm_activities: bool) -> None:
     """
-
     Args:
-        file_name (string): name of directory with tuned models
-        arm_activities (Boolean): detecting gait (true) or detecting gait without arm activites (false)
+        file_name (string): Name of directory with tuned models.
+        arm_activities (bool): If True, uses 3-class model, else, 2-classes.
     """
 
     path_splits = os.path.join(os.path.dirname(__file__), "splits.json")
@@ -272,7 +271,7 @@ def set_specificity_thresholds(file_name: str, arm_activities: bool) -> None:
 
     k = data["folds"]
 
-    all_tresholds = {}
+    all_threshold = {}
 
     for fold in range(k):
         test_idx = data[str(fold)]
@@ -298,14 +297,14 @@ def set_specificity_thresholds(file_name: str, arm_activities: bool) -> None:
         max_tpr = np.argmax(tpr[pass_tresh])
         threshold = thresholds[max_tpr]
 
-        all_tresholds[int(fold)] = float(threshold)
+        all_threshold[int(fold)] = float(threshold)
 
     print("Threshold sucessfully saved")
 
-    path_splits = os.path.join(os.path.dirname(__file__), "tresholds.json")
+    path_splits = os.path.join(os.path.dirname(__file__), "threshold.json")
 
     with open(path_splits, "w") as file:
-        json.dump(all_tresholds, file)
+        json.dump(all_threshold, file)
 
 
 if __name__ == "__main__":
@@ -324,10 +323,10 @@ if __name__ == "__main__":
 
     if model == "model1":
         dataset = DatasetWalking()
-        set_specificity_thresholds(file_name, False)
+        set_specificity_threshold(file_name, False)
         run_evaluations(file_name, False)
 
     elif model == "model2":
         dataset = DatasetArmActivities()
-        set_specificity_thresholds(file_name, True)
+        set_specificity_threshold(file_name, True)
         run_evaluations(file_name, True)

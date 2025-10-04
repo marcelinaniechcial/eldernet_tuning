@@ -3,6 +3,8 @@ import torch
 
 
 class DeepClassifier(nn.Module):
+    """Deep classifier (HEAD) of the model"""
+
     def __init__(self, input_size, output_size):
         super(Classifier, self).__init__()
         self.linear1 = torch.nn.Linear(input_size, 64)
@@ -19,6 +21,8 @@ class DeepClassifier(nn.Module):
 
 
 class Classifier(nn.Module):
+    """Simple classifier (HEAD) of the model"""
+
     def __init__(self, input_size, output_size):
         super(Classifier, self).__init__()
         self.linear1 = torch.nn.Linear(input_size, output_size)
