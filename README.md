@@ -29,6 +29,8 @@ The task of recognizing gait without other arm activities is significantly harde
 
 There is a limited amount of available annotated accelerometer data from Parkinson’s Patients. Nevertheless, the use of self-supervised pre-trained weights from the model trained on the older adults allowed the network to achieve accurate classification on PD Patients. The first task of gait recognition showed ElderNet to perform comparably to standard classifiers. A larger performance gap, indicating the superiority of simpler models, was observed in the more complex task of recognizing gait without other arm activities. This is likely because the task diverges significantly from ElderNet's pre-trained objective. Further research is necessary to generalize these results to other neural network architectures.
 
+## References
+
 Brand YE, Kluge F, Palmerini L, Paraschiv-Ionescu A, Becker C, Cereatti A, Maetzler W, Sharrack B, Vereijken B, Yarnall AJ, Rochester L, Del Din S, Muller A, Buchman AS, Hausdorff JM, Perlman O. Automated Gait Detection in Older Adults during Daily-Living using Self-Supervised Learning of Wrist-Worn Accelerometer Data: Development and Validation of ElderNet. Res Sq [Preprint]. 2024 Mar 15:rs.3.rs-4102403. doi: 10.21203/rs.3.rs-4102403/v1. Update in: Sci Rep. 2024 Sep 6;14(1):20854. doi: 10.1038/s41598-024-71491-3. PMID: 38559043; PMCID: PMC10980143.
 
 Brand, Y.E., Kluge, F., Palmerini, L. et al. Self-supervised learning of wrist-worn daily living accelerometer data improves the automated detection of gait in older adults. Sci Rep 14, 20854 (2024). https://doi.org/10.1038/s41598-024-71491-3
